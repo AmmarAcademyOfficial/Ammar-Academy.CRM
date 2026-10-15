@@ -1,0 +1,96 @@
+@import "tailwindcss";
+
+/*
+ * Ammar Academy CRM design tokens.
+ * Brand navy #0E0F3B and orange #F7931E. Orange on white is ~2.3:1, so it is
+ * used for fills and accents only; orange text uses --color-orange-ink (~5:1).
+ */
+@theme {
+  --font-sans: "Inter Variable", "Noto Sans Arabic Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-arabic: "Noto Sans Arabic Variable", "Inter Variable", sans-serif;
+
+  --color-navy-950: #07081f;
+  --color-navy-900: #0e0f3b;
+  --color-navy-800: #1b1d55;
+  --color-navy-700: #2a2d6e;
+  --color-navy-600: #3d4190;
+  --color-navy-100: #e6e7f4;
+  --color-navy-50: #f3f3fa;
+
+  --color-orange-500: #f7931e;
+  --color-orange-400: #f9a94d;
+  --color-orange-100: #fdebd3;
+  --color-orange-50: #fef6eb;
+  --color-orange-ink: #a85a00;
+
+  --color-ink: #16173a;
+  --color-muted: #555873;
+  --color-line: #e2e3ec;
+  --color-canvas: #f6f6f9;
+
+  --color-ok: #17794a;
+  --color-ok-bg: #e5f4ec;
+  --color-warn: #8a5300;
+  --color-warn-bg: #fff3dc;
+  --color-bad: #b42318;
+  --color-bad-bg: #fde8e6;
+  --color-info: #1f5fa8;
+  --color-info-bg: #e5effa;
+
+  --radius-card: 12px;
+  --shadow-panel: 0 12px 40px -12px rgb(14 15 59 / 0.28);
+}
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+}
+
+body {
+  font-family: var(--font-sans);
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Phone numbers stay left-to-right and evenly spaced inside Arabic text. */
+.phone {
+  direction: ltr;
+  unicode-bidi: isolate;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-navy-600);
+  outline-offset: 2px;
+}
+
+dialog::backdrop {
+  background: rgb(7 8 31 / 0.45);
+}
+
+dialog[open].drawer {
+  animation: drawer-in 180ms ease-out;
+}
+
+@keyframes drawer-in {
+  from {
+    transform: translateX(24px);
+    opacity: 0.4;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  dialog[open].drawer {
+    animation: none;
+  }
+}
+
+.scrollbar-thin {
+  scrollbar-width: thin;
+}

@@ -1,0 +1,56 @@
+# Runs on every push and pull request. Vercel deploys only what is pushed, so a red check here
+# means: do not promote that deployment.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Lint, types, unit and database tests, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run test:db
+      - run: npm run build
+
+  browser:
+    name: Browser journeys, accessibility and console scan
+    needs: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: npm ci
+      - run: pip install playwright==1.56.0 && python -m playwright install --with-deps chromium
+      - run: npm run build
+      - run: bash scripts/run-browser-suites.sh
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-test-logs
+          path: ${{ runner.temp }}/crm-test-logs/
+          retention-days: 7
