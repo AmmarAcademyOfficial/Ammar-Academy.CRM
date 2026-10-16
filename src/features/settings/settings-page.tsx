@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDown, ArrowUp, BarChart3, ChevronRight, FileWarning, Lock, Plus, UserPlus } from "lucide-react";
+import { ArrowDown, ArrowUp, BarChart3, ChevronRight, FileWarning, KeyRound, Lock, Plus, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { StageBadge, TAG_COLORS, TagChip } from "@/components/ui/badges";
@@ -21,6 +21,7 @@ import {
   renameStage,
   setUserActive,
   setUserLeadCap,
+  setUserPassword,
   setUserRole,
   updateSettings,
   updateTag,
@@ -101,13 +102,14 @@ function UsersSection() {
   const runAction = useRunAction();
   const [inviting, setInviting] = useState(false);
   const [deactivating, setDeactivating] = useState<Profile | null>(null);
+  const [passwordFor, setPasswordFor] = useState<Profile | null>(null);
   const people = [...ref.profiles].sort((a, b) => Number(b.active) - Number(a.active) || a.fullName.localeCompare(b.fullName));
   return (
     <Card>
-      <CardHeader title="Staff accounts" subtitle="No public sign-up. Managers invite staff by email." action={<Button size="sm" variant="primary" icon={<UserPlus size={14} />} onClick={() => setInviting(true)}>Invite user</Button>} />
+      <CardHeader title="Staff accounts" subtitle="No public sign-up. Managers add staff and can set or reset their passwords." action={<Button size="sm" variant="primary" icon={<UserPlus size={14} />} onClick={() => setInviting(true)}>Add user</Button>} />
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
-          <thead><tr className="border-b border-line text-left text-xs text-muted"><th className="px-4 py-2 font-medium">Name</th><th className="px-3 py-2 font-medium">Role</th>{ref.settings.perAgentLeadCapEnabled && <th className="px-3 py-2 font-medium">Lead cap</th>}<th className="px-3 py-2 font-medium">Active</th></tr></thead>
+          <thead><tr className="border-b border-line text-left text-xs text-muted"><th className="px-4 py-2 font-medium">Name</th><th className="px-3 py-2 font-medium">Role</th>{ref.settings.perAgentLeadCapEnabled && <th className="px-3 py-2 font-medium">Lead cap</th>}<th className="px-3 py-2 font-medium">Active</th><th className="px-3 py-2 font-medium">Password</th></tr></thead>
           <tbody>
             {people.map((u) => (
               <tr key={u.id} className="border-b border-line/70 last:border-0">
@@ -133,6 +135,9 @@ function UsersSection() {
                     else runAction(setUserActive(u.id, v), v ? "User reactivated" : "User deactivated. Their history is kept.", { reference: true });
                   }} />
                 </td>
+                <td className="px-3 py-2.5">
+                  <Button size="sm" icon={<KeyRound size={14} />} disabled={!u.active} onClick={() => setPasswordFor(u)} aria-label={`Set password for ${u.fullName}`}>Set password</Button>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -140,6 +145,7 @@ function UsersSection() {
       </div>
       <p className="border-t border-line px-4 py-2.5 text-xs text-muted">Deactivated staff cannot sign in; their notes and history stay. The last active manager cannot be deactivated or demoted.</p>
       {inviting && <InviteDialog onClose={() => setInviting(false)} />}
+      {passwordFor && <SetPasswordDialog user={passwordFor} onClose={() => setPasswordFor(null)} />}
       {deactivating && (
         <Dialog
           open
@@ -161,18 +167,62 @@ function UsersSection() {
   );
 }
 
+const PASSWORD_HINT = "At least 10 characters, with an uppercase letter, a lowercase letter and a number.";
+
+function passwordProblem(pw: string, confirm: string): string | null {
+  if (pw.length < 10) return "Use at least 10 characters.";
+  if (!/[a-z]/.test(pw) || !/[A-Z]/.test(pw) || !/[0-9]/.test(pw)) return "Include an uppercase letter, a lowercase letter and a number.";
+  if (pw !== confirm) return "The two passwords do not match.";
+  return null;
+}
+
+function PasswordFields({ pw, confirm, onChange }: { pw: string; confirm: string; onChange: (pw: string, confirm: string) => void }) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="space-y-3">
+      <Field label="Password" required hint={PASSWORD_HINT}>
+        {(p) => <Input type={show ? "text" : "password"} dir="ltr" autoComplete="new-password" value={pw} onChange={(e) => onChange(e.target.value, confirm)} {...p} />}
+      </Field>
+      <Field label="Type the password again" required>
+        {(p) => <Input type={show ? "text" : "password"} dir="ltr" autoComplete="new-password" value={confirm} onChange={(e) => onChange(pw, e.target.value)} {...p} />}
+      </Field>
+      <label className="flex items-center gap-2 text-sm text-muted">
+        <input type="checkbox" checked={show} onChange={(e) => setShow(e.target.checked)} /> Show password
+      </label>
+    </div>
+  );
+}
+
 function InviteDialog({ onClose }: { onClose: () => void }) {
   const runAction = useRunAction();
   const [form, setForm] = useState({ fullName: "", email: "", role: "sales" as Role });
+  const [method, setMethod] = useState<"password" | "email">("password");
+  const [pw, setPw] = useState({ pw: "", confirm: "" });
+  const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const submit = async () => {
+    if (method === "password") {
+      const p = passwordProblem(pw.pw, pw.confirm);
+      setProblem(p);
+      if (p) return;
+    }
     setBusy(true);
-    const r = await runAction(inviteUser(form), `Invitation sent to ${form.email}`, { reference: true });
+    const r = await runAction(
+      inviteUser({ ...form, password: method === "password" ? pw.pw : "" }),
+      method === "password" ? `Account created for ${form.fullName}. Give them their password in person.` : `Invitation sent to ${form.email}`,
+      { reference: true },
+    );
     setBusy(false);
     if (r.ok) onClose();
   };
   return (
-    <Dialog open onClose={onClose} title="Invite a staff member" description="They receive an email with a link to choose their password." footer={<><Button onClick={onClose}>Cancel</Button><Button variant="primary" disabled={busy} onClick={submit}>{busy ? "Sending…" : "Send invitation"}</Button></>}>
+    <Dialog
+      open
+      onClose={onClose}
+      title="Add a staff member"
+      description="Choose a password for them now, or email them a link to choose their own."
+      footer={<><Button onClick={onClose}>Cancel</Button><Button variant="primary" disabled={busy} onClick={submit}>{busy ? "Saving…" : method === "password" ? "Create account" : "Send invitation"}</Button></>}
+    >
       <div className="space-y-4">
         <Field label="Full name" required>{(p) => <Input value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} {...p} />}</Field>
         <Field label="Work email" required>{(p) => <Input type="email" dir="ltr" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} {...p} />}</Field>
@@ -185,6 +235,49 @@ function InviteDialog({ onClose }: { onClose: () => void }) {
             </Select>
           )}
         </Field>
+        <fieldset className="space-y-2">
+          <legend className="mb-1 text-sm font-medium">How will they sign in?</legend>
+          <label className="flex items-start gap-2 text-sm">
+            <input type="radio" name="signin-method" className="mt-1" checked={method === "password"} onChange={() => setMethod("password")} />
+            <span><span className="font-medium">Set a password now</span><span className="block text-xs text-muted">They can sign in straight away. Tell them the password in person, not by chat.</span></span>
+          </label>
+          <label className="flex items-start gap-2 text-sm">
+            <input type="radio" name="signin-method" className="mt-1" checked={method === "email"} onChange={() => setMethod("email")} />
+            <span><span className="font-medium">Email them an invitation link</span><span className="block text-xs text-muted">They choose their own password from the email.</span></span>
+          </label>
+        </fieldset>
+        {method === "password" && <PasswordFields pw={pw.pw} confirm={pw.confirm} onChange={(a, b) => { setPw({ pw: a, confirm: b }); setProblem(null); }} />}
+        {problem && <p role="alert" className="text-sm text-red-700">{problem}</p>}
+      </div>
+    </Dialog>
+  );
+}
+
+function SetPasswordDialog({ user, onClose }: { user: Profile; onClose: () => void }) {
+  const runAction = useRunAction();
+  const [pw, setPw] = useState({ pw: "", confirm: "" });
+  const [problem, setProblem] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const submit = async () => {
+    const p = passwordProblem(pw.pw, pw.confirm);
+    setProblem(p);
+    if (p) return;
+    setBusy(true);
+    const r = await runAction(setUserPassword(user.id, pw.pw), `New password set for ${user.fullName}`);
+    setBusy(false);
+    if (r.ok) onClose();
+  };
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      title={`Set a new password for ${user.fullName}`}
+      description="Their old password stops working immediately. Tell them the new one in person, not by chat."
+      footer={<><Button onClick={onClose}>Cancel</Button><Button variant="primary" disabled={busy} onClick={submit}>{busy ? "Saving…" : "Save password"}</Button></>}
+    >
+      <div className="space-y-4">
+        <PasswordFields pw={pw.pw} confirm={pw.confirm} onChange={(a, b) => { setPw({ pw: a, confirm: b }); setProblem(null); }} />
+        {problem && <p role="alert" className="text-sm text-red-700">{problem}</p>}
       </div>
     </Dialog>
   );

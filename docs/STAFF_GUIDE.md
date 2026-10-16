@@ -44,8 +44,12 @@ You see handed-over customers only (the queue and your own), never sales prospec
   - *Confirmed payments* exclude pending, rejected and reversed payments.
 - **Settings → Audit History**: who changed what (roles, reassignments, prices, payment decisions, settings).
 
+**Staff accounts** (*Settings → Users and Roles*):
+- **Add user**: name, email, role, then either **Set a password now** (they can sign in straight away) or **Email them an invitation link** (they choose their own password).
+- **Set password** on any active person replaces their password immediately, for example when someone forgets it. Passwords need at least 10 characters with an uppercase letter, a lowercase letter and a number. Tell people their password in person, never by chat. Each change is recorded in **Audit History** (the password itself is never stored or shown).
+
 **Settings you own**: users and roles, shifts, courses and prices, customer fields, stages, tags, follow-up rules, payment handover rule and deposit per program, the support checklist, Google Sheets connections.
 
 ## Getting help
-- Forgot password: **Forgot your password?** on the sign-in page.
+- Forgot password: ask a manager to **Set password** for you, or use **Forgot your password?** on the sign-in page.
 - Something looks wrong: note the customer, the time and what you clicked, and tell a manager. Managers can check **Audit History** and the customer's timeline.

@@ -246,10 +246,21 @@ export async function updateSettings(patch: Partial<Settings>): Promise<Result<v
 
 // ── Staff accounts ───────────────────────────────────────────────────────
 
+/** Same rules as the Supabase project (supabase/config.toml): 10+ characters, upper and lower case, a digit. */
+const staffPassword = z
+  .string()
+  .min(10, "Use at least 10 characters")
+  .max(72, "Use at most 72 characters")
+  .regex(/[a-z]/, "Include a lowercase letter")
+  .regex(/[A-Z]/, "Include an uppercase letter")
+  .regex(/[0-9]/, "Include a number");
+
 const inviteSchema = z.object({
   fullName: z.string().trim().min(1, "Add the person's name").max(120),
   email: z.string().trim().email("Enter a valid email address"),
   role: z.enum(["manager", "sales", "support"]),
+  // Optional: set a password now instead of emailing an invitation link.
+  password: z.union([z.literal(""), staffPassword]).optional(),
 });
 
 async function appUrl(): Promise<string> {
@@ -270,6 +281,16 @@ export async function inviteUser(input: unknown): Promise<Result<void>> {
       // Local development: create the login row directly (no email is sent).
       const [u] = await asSystem((tx) => tx<{ id: string }[]>`insert into auth.users (email) values (${v.email.toLowerCase()}) on conflict (email) do update set email = excluded.email returning id`);
       userId = u.id;
+    } else if (v.password) {
+      // The manager chose the password: create a confirmed login, no email needed.
+      const { data, error } = await supabaseAdmin().auth.admin.createUser({
+        email: v.email,
+        password: v.password,
+        email_confirm: true,
+        user_metadata: { full_name: v.fullName },
+      });
+      if (error || !data.user) throw new ValidationError(friendlyAuthError(error?.message) ?? "The account could not be created.");
+      userId = data.user.id;
     } else {
       const { data, error } = await supabaseAdmin().auth.admin.inviteUserByEmail(v.email, {
         redirectTo: `${await appUrl()}/auth/confirm?next=/reset-password`,
@@ -280,6 +301,29 @@ export async function inviteUser(input: unknown): Promise<Result<void>> {
     }
     await asUser(staff.id, (tx) => tx`select public.admin_create_profile(${userId}, ${v.fullName}, ${v.email}, ${v.role}::public.app_role)`);
     refreshReference();
+  });
+}
+
+function friendlyAuthError(message: string | undefined): string | undefined {
+  if (!message) return undefined;
+  if (/already (been )?registered|already exists/i.test(message)) return "A login with this email already exists.";
+  if (/password/i.test(message)) return `Supabase refused the password: ${message}`;
+  return message;
+}
+
+/** Manager sets or resets a staff member's password. The password is never stored by the CRM or logged. */
+export async function setUserPassword(userId: string, password: string): Promise<Result<void>> {
+  return attempt(async () => {
+    const id = check(uuid, userId);
+    const pw = check(staffPassword, password);
+    const staff = await requireStaff();
+    if (staff.role !== "manager") throw new ValidationError("Only managers can set passwords.");
+    if (env().AUTH_MODE !== "supabase") throw new ValidationError("Passwords are not used with local sign-in.");
+    const [target] = await asSystem((tx) => tx<{ full_name: string }[]>`select full_name from public.profiles where id = ${id}`);
+    if (!target) throw new ValidationError("User not found.");
+    const { error } = await supabaseAdmin().auth.admin.updateUserById(id, { password: pw });
+    if (error) throw new ValidationError(friendlyAuthError(error.message) ?? "The password could not be changed.");
+    await asSystem((tx) => tx`insert into public.audit_log (actor_id, action, target) values (${staff.id}, 'Set a new password', ${target.full_name})`);
   });
 }
 

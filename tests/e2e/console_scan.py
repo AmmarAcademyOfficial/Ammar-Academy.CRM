@@ -108,7 +108,7 @@ with sync_playwright() as p:
         visit(m, path)
     for section in ["users", "shifts", "courses", "fields", "stages", "tags", "followups", "payments", "checklist", "sheets", "audit"]:
         visit(m, f"/settings/{section}")
-    visit(m, "/settings/users"); open_and_close(m, "Invite user")
+    visit(m, "/settings/users"); open_and_close(m, "Add user"); open_and_close(m, "Set password")
     visit(m, "/settings/courses"); open_and_close(m, "Add course"); open_and_close(m, "Add type")
     visit(m, "/settings/checklist"); open_and_close(m, "Add step")
     visit(m, "/settings/sheets"); open_and_close(m, "Connect Google Sheet")
