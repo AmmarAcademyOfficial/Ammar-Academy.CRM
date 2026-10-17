@@ -10,9 +10,12 @@ import { env } from "./env";
 function key(): Buffer {
   const k = env().TOKEN_ENCRYPTION_KEY;
   if (k) {
-    const buf = Buffer.from(k, "base64");
-    if (buf.length !== 32) throw new Error("TOKEN_ENCRYPTION_KEY must be 32 random bytes, base64-encoded.");
-    return buf;
+    // Either 32 random bytes in base64 (openssl rand -base64 32), or a long random passphrase
+    // (40+ characters), which is stretched to 32 bytes with SHA-256.
+    const buf = /^[A-Za-z0-9+/]{43}=$/.test(k) ? Buffer.from(k, "base64") : null;
+    if (buf?.length === 32) return buf;
+    if (k.length >= 40) return createHash("sha256").update(k, "utf8").digest();
+    throw new Error("TOKEN_ENCRYPTION_KEY must be 32 random bytes in base64, or a random passphrase of at least 40 characters.");
   }
   if (env().GOOGLE_MODE === "real") throw new Error("TOKEN_ENCRYPTION_KEY is not set.");
   // Local review only (fake Google, local database): a fixed development key.
