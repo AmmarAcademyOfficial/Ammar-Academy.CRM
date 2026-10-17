@@ -95,6 +95,13 @@ with sync_playwright() as p:
     mob.goto(f"{BASE}/settings/users")
     mob.wait_for_load_state("networkidle")
     check("Users settings fit a phone screen", not mob.evaluate("document.documentElement.scrollWidth > window.innerWidth + 1"))
+    # Privacy policy: public (no sign-in), linked from the sign-in page, as Google requires.
+    anon = browser.new_context().new_page()
+    anon.goto(f"{BASE}/login")
+    anon.get_by_role("link", name="Privacy policy").click()
+    anon.wait_for_url("**/privacy")
+    check("Privacy policy opens without signing in, linked from sign-in",
+          anon.get_by_role("heading", name="Privacy policy").is_visible() and anon.get_by_text("Limited Use").count() > 0)
     browser.close()
 
 print(f"\n{sum(ok for _, ok in results)}/{len(results)} checks passed")

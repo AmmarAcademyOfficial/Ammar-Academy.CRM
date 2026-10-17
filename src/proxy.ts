@@ -8,7 +8,7 @@ import { NextResponse, type NextRequest } from "next/server";
  * This is only a convenience redirect. Every page, API route and server action
  * checks the session again on the server, and the database enforces permissions.
  */
-const PUBLIC = ["/login", "/forgot-password", "/auth/confirm"];
+const PUBLIC = ["/login", "/forgot-password", "/auth/confirm", "/privacy"];
 
 export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;

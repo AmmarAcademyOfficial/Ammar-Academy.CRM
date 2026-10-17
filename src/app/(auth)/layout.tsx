@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
 
 /** Sign-in pages: brand panel on wide screens, a single column on phones. */
@@ -19,7 +20,10 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
         <p className="text-xs text-navy-100/50">Times shown in Cairo time.</p>
       </aside>
       <main className="flex items-center justify-center bg-canvas px-4 py-10">
-        <div className="w-full max-w-sm">{children}</div>
+        <div className="w-full max-w-sm">
+          {children}
+          <p className="mt-8 text-center text-xs text-muted"><Link href="/privacy" className="underline hover:text-ink">Privacy policy</Link></p>
+        </div>
       </main>
     </div>
   );
