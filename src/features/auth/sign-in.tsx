@@ -6,13 +6,13 @@ import { useActionState } from "react";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/form";
 import { localSignIn, requestPasswordReset, signIn, updatePassword, type FormState } from "@/server/auth-actions";
+import { LogoWithLabel } from "@/components/ui/logo";
 
 function Heading({ title, sub }: { title: string; sub?: string }) {
   return (
     <div className="mb-6">
-      <div className="mb-6 flex items-center gap-2.5 lg:hidden">
-        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-navy-900 font-bold text-orange-400" aria-hidden>A</span>
-        <span className="font-semibold text-navy-900">Ammar Academy CRM</span>
+      <div className="mb-6 flex items-center lg:hidden">
+        <LogoWithLabel height={64} />
       </div>
       <h1 className="text-2xl font-semibold tracking-tight text-navy-900">{title}</h1>
       {sub && <p className="mt-1 text-sm text-muted">{sub}</p>}

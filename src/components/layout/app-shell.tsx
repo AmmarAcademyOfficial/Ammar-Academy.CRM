@@ -14,15 +14,12 @@ import { signOut } from "@/server/auth-actions";
 import { cn as clsx } from "../ui/cn";
 import { Avatar } from "../ui/misc";
 import { NAV } from "./nav";
+import { LogoWithLabel } from "../ui/logo";
 
 export function BrandMark() {
   return (
-    <div className="flex items-center gap-2.5">
-      <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-orange-500 text-[17px] font-bold text-navy-900" aria-hidden>A</span>
-      <span className="leading-tight">
-        <span className="block text-[15px] font-semibold text-white">Ammar Academy</span>
-        <span className="block text-[11px] font-medium uppercase tracking-[0.14em] text-orange-400">CRM</span>
-      </span>
+    <div className="flex items-center">
+      <LogoWithLabel height={58} onDark />
     </div>
   );
 }
@@ -137,7 +134,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="flex min-h-dvh flex-col">
       <div className="flex flex-1">
         <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col bg-navy-900 px-3 py-4 lg:flex">
-          <div className="px-2"><BrandMark /></div>
+          <div className="px-2 pt-1"><BrandMark /></div>
           <nav aria-label="Main" className="mt-7 flex flex-col gap-0.5">
             {items.map(({ path: p, label, icon: Icon }) => (
               <Link
@@ -171,9 +168,8 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-line bg-white/95 px-4 backdrop-blur lg:px-8">
-            <span className="flex items-center gap-2 lg:hidden">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-navy-900 text-sm font-bold text-orange-400" aria-hidden>A</span>
-              <span className="text-sm font-semibold text-navy-900">Ammar Academy CRM</span>
+            <span className="flex items-center lg:hidden">
+              <LogoWithLabel height={38} />
             </span>
             <div className="ml-auto flex items-center gap-1">
               <NotificationsMenu />
