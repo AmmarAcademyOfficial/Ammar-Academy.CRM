@@ -237,6 +237,9 @@ export async function updateSettings(patch: Partial<Settings>): Promise<Result<v
       note_edit_window_minutes: patch.noteEditWindowMinutes,
       unopened_alert_minutes: patch.unopenedAlertMinutes,
       payment_due_soon_days: patch.paymentDueSoonDays,
+      late_cancel_hours: patch.lateCancelHours,
+      late_cancel_paid: patch.lateCancelPaid,
+      no_show_paid: patch.noShowPaid,
       handover_trigger: patch.handoverTrigger,
       deposit_rule: patch.depositRule,
     };

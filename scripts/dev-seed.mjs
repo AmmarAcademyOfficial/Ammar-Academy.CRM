@@ -223,6 +223,18 @@ export async function seedDev(admin) {
   const tDina = await teacher("Dina Kamal", [programs.IELTS], [["IELTS private", 450]]);
   await asUser(manager, "select public.assign_teacher($1)", [{ teacher_id: tSami.id, rate_id: tSami.rates["SAT group"], course_id: courses.satFull, subject: "Math", started_on: "2026-10-01" }]);
   await asUser(manager, "select public.assign_teacher($1)", [{ teacher_id: tDina.id, rate_id: tDina.rates["IELTS private"], enrollment_id: eSara, started_on: "2026-10-15" }]);
+  // Sessions: Sara's private lessons (two done, one not yet recorded, one tomorrow) and a group class today.
+  const at = (days, hour) => new Date(Date.parse(new Date(Date.now() + 3 * 3600_000).toISOString().slice(0, 10) + `T${String(hour).padStart(2, "0")}:00:00+03:00`) + days * 86_400_000).toISOString();
+  const [{ id: aSara }] = await q("select id from public.teacher_assignments where enrollment_id = $1", [eSara]);
+  const [{ id: aGroup }] = await q("select id from public.teacher_assignments where course_id = $1", [courses.satFull]);
+  await asUser(manager, "select public.schedule_sessions($1)", [{ assignment_id: aSara, starts_at: at(-6, 17), planned_hours: 1.5, repeat_weeks: 0 }]);
+  await asUser(manager, "select public.schedule_sessions($1)", [{ assignment_id: aSara, starts_at: at(-3, 17), planned_hours: 1.5, repeat_weeks: 0 }]);
+  await asUser(manager, "select public.schedule_sessions($1)", [{ assignment_id: aSara, starts_at: at(-1, 17), planned_hours: 1.5, repeat_weeks: 0 }]);
+  await asUser(manager, "select public.schedule_sessions($1)", [{ assignment_id: aSara, starts_at: at(1, 17), planned_hours: 1.5, repeat_weeks: 0 }]);
+  await asUser(manager, "select public.schedule_sessions($1)", [{ assignment_id: aGroup, starts_at: at(0, 6), planned_hours: 2, repeat_weeks: 0 }]);
+  const saraSessions = await q("select id from public.teacher_sessions where assignment_id = $1 order by starts_at limit 2", [aSara]);
+  await asUser(manager, "select public.record_session($1)", [{ id: saraSessions[0].id, status: "done", hours: 1.5 }]);
+  await asUser(manager, "select public.record_session($1)", [{ id: saraSessions[1].id, status: "cancelled_student", late: true }]);
 
   // Courses of interest on a few more leads.
   await asUser(ids.nour, "select public.set_inquiry_course($1, $2)", [await inquiryOf("Nadine Wahba"), courses.ieltsAcademic]);

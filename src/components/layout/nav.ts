@@ -2,6 +2,7 @@ import {
   BarChart3,
   Calculator,
   CalendarClock,
+  CalendarDays,
   CreditCard,
   Headset,
   LayoutDashboard,
@@ -28,12 +29,14 @@ export const NAV: Record<Role, NavItem[]> = {
   support: [
     { path: "/my-work", label: "My Work", icon: ListChecks },
     { path: "/customers", label: "Customers", icon: Headset },
+    { path: "/sessions", label: "Sessions", icon: CalendarDays },
     { path: "/follow-ups", label: "Follow-ups", icon: CalendarClock },
   ],
   manager: [
     { path: "/overview", label: "Overview", icon: LayoutDashboard },
     { path: "/leads", label: "Leads", icon: Users },
     { path: "/customers", label: "Support", icon: Headset },
+    { path: "/sessions", label: "Sessions", icon: CalendarDays },
     { path: "/payments", label: "Payments", icon: CreditCard },
     { path: "/accounting", label: "Accounting", icon: Calculator },
     { path: "/reports", label: "Reports", icon: BarChart3 },

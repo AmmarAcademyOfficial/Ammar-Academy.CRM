@@ -190,7 +190,8 @@ export type ActivityType =
   | "support_assignment"
   | "support_follow_up"
   | "payment_plan"
-  | "teacher";
+  | "teacher"
+  | "session";
 
 export interface Activity {
   id: ID;
@@ -280,6 +281,32 @@ export interface TeacherRate {
   archived: boolean;
   /** Amount per hour from each date, newest first. */
   amounts: { amount: number; validFrom: string }[];
+}
+
+export type SessionStatus = "scheduled" | "done" | "cancelled_student" | "cancelled_teacher" | "no_show";
+
+/** One teaching session. Paid and student hours are fixed when it is recorded. */
+export interface TeachingSession {
+  id: ID;
+  assignmentId: ID;
+  teacherId: ID;
+  rateId: ID;
+  enrollmentId?: ID;
+  courseId?: ID;
+  inquiryId?: ID;
+  customerName?: string;
+  supportOwnerId?: ID;
+  subject?: string;
+  startsAt: Timestamp;
+  plannedHours: number;
+  status: SessionStatus;
+  hours?: number;
+  lateCancel: boolean;
+  paidHours: number;
+  studentHours: number;
+  note?: string;
+  recordedById?: ID;
+  recordedAt?: Timestamp;
 }
 
 /** A teacher and rate for a private customer (enrollment) or a group course. */
@@ -516,4 +543,10 @@ export interface Settings {
   unopenedAlertMinutes: number;
   /** "Payment due soon" goes out this many days before a planned payment. 0 = off. */
   paymentDueSoonDays: number;
+  /** A student cancellation this many hours or less before the session is "late". */
+  lateCancelHours: number;
+  /** Late student cancellations are paid to the teacher and use package hours. */
+  lateCancelPaid: boolean;
+  /** No-shows are paid to the teacher and use package hours. */
+  noShowPaid: boolean;
 }

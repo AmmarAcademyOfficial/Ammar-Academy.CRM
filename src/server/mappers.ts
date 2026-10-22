@@ -15,6 +15,7 @@ import type {
   PaymentSubmission,
   Teacher,
   TeacherAssignment,
+  TeachingSession,
   SupportFollowUp,
   FieldDefinition,
   FollowUp,
@@ -155,6 +156,29 @@ export const mapTeacherAssignment = (r: Row): TeacherAssignment => ({
   inquiryId: strOpt(r.inquiry_id),
 });
 
+export const mapSession = (r: Row): TeachingSession => ({
+  id: str(r.id),
+  assignmentId: str(r.assignment_id),
+  teacherId: str(r.teacher_id),
+  rateId: str(r.rate_id),
+  enrollmentId: strOpt(r.enrollment_id),
+  courseId: strOpt(r.course_id),
+  inquiryId: strOpt(r.inquiry_id),
+  customerName: strOpt(r.customer_name),
+  supportOwnerId: strOpt(r.support_owner_id),
+  subject: strOpt(r.subject),
+  startsAt: iso(r.starts_at),
+  plannedHours: Number(r.planned_hours),
+  status: r.status as TeachingSession["status"],
+  hours: r.hours === null || r.hours === undefined ? undefined : Number(r.hours),
+  lateCancel: Boolean(r.late_cancel),
+  paidHours: Number(r.paid_hours),
+  studentHours: Number(r.student_hours),
+  note: strOpt(r.note),
+  recordedById: strOpt(r.recorded_by),
+  recordedAt: isoOpt(r.recorded_at),
+});
+
 export const mapPaymentDue = (r: Row): PaymentDue => ({
   id: str(r.id),
   enrollmentId: str(r.enrollment_id),
@@ -238,6 +262,9 @@ export const mapSettings = (r: Row): Settings => ({
   noteEditWindowMinutes: Number(r.note_edit_window_minutes),
   unopenedAlertMinutes: Number(r.unopened_alert_minutes ?? 30),
   paymentDueSoonDays: Number(r.payment_due_soon_days ?? 1),
+  lateCancelHours: Number(r.late_cancel_hours ?? 6),
+  lateCancelPaid: r.late_cancel_paid === undefined ? true : Boolean(r.late_cancel_paid),
+  noShowPaid: r.no_show_paid === undefined ? true : Boolean(r.no_show_paid),
 });
 
 export const mapLeadRow = (r: Row): LeadRowDTO => ({

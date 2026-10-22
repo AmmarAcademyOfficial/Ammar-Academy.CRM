@@ -41,6 +41,7 @@ export const NOTIFICATION_GROUPS: { title: string; events: NotificationEvent[] }
       { key: "handed_over", label: "Customer handed over to support", description: "The agent's customer enrolled and moved to support.", roles: ["sales"] },
       { key: "new_customer_ready", label: "New customer ready for onboarding", description: "A newly enrolled customer is waiting for support.", roles: ["support"] },
       { key: "support_assigned", label: "Customer assigned for onboarding", description: "A customer is given to this support agent.", roles: ["support"] },
+      { key: "package_low", label: "Package almost used", description: "A private customer has 2 hours or fewer left in their package.", roles: ["support", "manager"] },
       { key: "customer_flagged", label: "Customer flagged after a payment reversal", description: "A handed-over customer's confirmed payments fell below the handover rule.", roles: ["support", "manager"] },
     ],
   },

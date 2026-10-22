@@ -9,6 +9,7 @@ import type {
   Teacher,
   TeacherAssignment,
   TeacherRate,
+  TeachingSession,
   PaymentDue,
   NotificationRule,
   AuditEntry,
@@ -101,6 +102,8 @@ export interface LeadDetail {
   dues: PaymentDue[];
   /** The customer's private teachers (current first). */
   teachers: TeacherAssignment[];
+  /** The customer's private sessions, oldest first. */
+  sessions: TeachingSession[];
   onboarding?: Onboarding;
   supportFollowUps: SupportFollowUp[];
   activities: Activity[];
@@ -372,4 +375,26 @@ export interface AccountingData {
   range: { from: string; to: string };
   payments: AccountingPayment[];
   customers: AccountingCustomer[];
+}
+
+// ── Sessions (phase 4) ───────────────────────────────────────────────────
+
+/** A current teacher assignment someone may schedule sessions for, with a readable label. */
+export interface SessionAssignment {
+  id: ID;
+  teacherId: ID;
+  rateId: ID;
+  enrollmentId?: ID;
+  courseId?: ID;
+  inquiryId?: ID;
+  label: string;
+  subject?: string;
+}
+
+export interface SessionsData {
+  range: { from: string; to: string };
+  sessions: TeachingSession[];
+  /** Past sessions (last 60 days) still marked scheduled: they need recording. */
+  unrecorded: TeachingSession[];
+  assignments: SessionAssignment[];
 }

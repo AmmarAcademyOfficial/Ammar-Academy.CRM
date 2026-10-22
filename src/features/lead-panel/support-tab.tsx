@@ -15,6 +15,7 @@ import { useRunAction } from "@/lib/run-action";
 import { useWorkspace } from "@/lib/workspace";
 import { assignCustomer, claimCustomer, clearCustomerFlag, completeSupportFollowUp, createSupportFollowUp, setChecklistItem, setSupportStatus } from "@/server/payment-actions";
 import { cairoLocalInput, fromCairoLocal } from "./dialogs";
+import { SessionsSection } from "./sessions-section";
 import { TeachersSection } from "./teachers-section";
 
 export function SupportTab({ detail }: { detail: LeadDetail }) {
@@ -50,6 +51,8 @@ export function SupportTab({ detail }: { detail: LeadDetail }) {
       </section>
 
       <TeachersSection detail={detail} canWork={canWork} />
+
+      <SessionsSection detail={detail} canWork={canWork} />
 
       <section>
         <div className="mb-2 flex items-center justify-between gap-3">

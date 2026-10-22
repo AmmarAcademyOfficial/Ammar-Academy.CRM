@@ -4,16 +4,18 @@ import { Archive, ArchiveRestore, GraduationCap, Pencil, Plus, UserPlus, Users }
 import { useState } from "react";
 import { Button, IconButton } from "@/components/ui/button";
 import { cn as clsx } from "@/components/ui/cn";
-import { Checkbox, Field, Input, Select, Textarea } from "@/components/ui/form";
+import { Checkbox, Field, Input, Select, Textarea, Toggle } from "@/components/ui/form";
 import { Card, CardHeader, EmptyState } from "@/components/ui/misc";
 import { Dialog } from "@/components/ui/overlay";
 import { academyMonth, shiftDay } from "@/domain/accounting";
-import type { Teacher, TeacherAssignment, TeacherRate } from "@/domain/types";
+import type { Settings, Teacher, TeacherAssignment, TeacherRate } from "@/domain/types";
 import { cairoParts, formatMoney } from "@/domain/rules";
 import { formatDay } from "@/features/leads/filters";
 import { useRunAction } from "@/lib/run-action";
 import { useApi, useWorkspace } from "@/lib/workspace";
+import { updateSettings } from "@/server/actions";
 import { addTeacherRate, assignTeacher, endTeacherAssignment, saveTeacher, setTeacherRateAmount, setTeacherRateArchived } from "@/server/teacher-actions";
+import { NumberSetting } from "./settings-page";
 
 /** The amount of a rate on a day (amounts are newest first). */
 export function amountOn(rate: TeacherRate, day: string) {
@@ -135,6 +137,8 @@ export function TeachersSettings() {
           </ul>
         )}
       </Card>
+
+      <SessionRules />
 
       {editing && <TeacherDialog teacher={editing} onClose={() => setEditing(null)} />}
       {addingRate && <RateDialog teacher={addingRate} onClose={() => setAddingRate(null)} />}
@@ -261,5 +265,30 @@ function GroupDialog({ teacher, onClose }: { teacher: Teacher; onClose: () => vo
         <Field label="Subject (optional)" className="sm:col-span-2">{(p) => <Input value={f.subject} maxLength={60} placeholder="e.g. Math" onChange={(e) => setF({ ...f, subject: e.target.value })} {...p} />}</Field>
       </div>
     </Dialog>
+  );
+}
+
+/** What a cancelled or missed session counts for. Applied when a session is recorded; past sessions keep their hours. */
+function SessionRules() {
+  const { ref } = useWorkspace();
+  const runAction = useRunAction();
+  const s = ref.settings;
+  const save = (patch: Partial<Settings>) => runAction(updateSettings(patch), "Setting saved", { reference: true });
+  return (
+    <Card>
+      <CardHeader title="Session rules" subtitle="Used when support records a session. Sessions already recorded keep their hours if you change these." />
+      <div className="divide-y divide-line">
+        <NumberSetting label="A student cancellation is late when it is less than" hint="Support ticks Late when recording a cancellation this close to the session." value={s.lateCancelHours} unit="hours before" onSave={(n) => save({ lateCancelHours: n })} />
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+          <div className="text-sm"><p>Late student cancellations are paid</p><p className="text-xs text-muted">The teacher is paid the planned hours, and they come out of the student&apos;s package.</p></div>
+          <Toggle label="Late student cancellations are paid" checked={s.lateCancelPaid} onChange={(v) => save({ lateCancelPaid: v })} />
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+          <div className="text-sm"><p>No-shows are paid</p><p className="text-xs text-muted">When the student does not attend: the teacher is paid the planned hours, and they come out of the package.</p></div>
+          <Toggle label="No-shows are paid" checked={s.noShowPaid} onChange={(v) => save({ noShowPaid: v })} />
+        </div>
+        <p className="px-4 py-3 text-xs text-muted">Cancellations in good time and cancellations by the teacher are never paid and never use package hours.</p>
+      </div>
+    </Card>
   );
 }
