@@ -137,14 +137,19 @@ with sync_playwright() as p:
     check("Managers see the week and can filter by teacher", True)
     shot(m, "03-manager-week")
     m.goto(f"{BASE}/settings/teachers")
+    m.wait_for_load_state("networkidle")  # a click before the page is interactive does nothing
     sw = m.get_by_role("switch", name="No-shows are paid")
     expect(sw).to_have_attribute("aria-checked", "true")
     sw.click()
-    expect(sw).to_have_attribute("aria-checked", "false")
-    m.wait_for_timeout(800)
-    check("Session rules are editable in Settings", sql("select no_show_paid from public.app_settings")[0]["no_show_paid"] is False)
+    expect(sw).to_have_attribute("aria-checked", "false", timeout=10000)
+    saved = lambda: sql("select no_show_paid from public.app_settings")[0]["no_show_paid"]
+    for _ in range(20):
+        if saved() is False:
+            break
+        m.wait_for_timeout(250)
+    check("Session rules are editable in Settings", saved() is False)
     sw.click()
-    m.wait_for_timeout(800)
+    expect(sw).to_have_attribute("aria-checked", "true", timeout=10000)
 
     # ── 4. Sales cannot open Sessions; phone layout ─────────────────────────
     sctx = browser.new_context(viewport={"width": 1440, "height": 900})

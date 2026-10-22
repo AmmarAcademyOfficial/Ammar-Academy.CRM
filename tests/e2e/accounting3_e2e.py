@@ -70,6 +70,7 @@ with sync_playwright() as p:
     mctx = browser.new_context(viewport={"width": 1440, "height": 900})
     m = sign_in(mctx, "Hana Farouk", "/overview")
     m.goto(f"{BASE}/settings/teachers")
+    m.wait_for_load_state("networkidle")  # a click before the page is interactive does nothing
     sami = m.locator("li[data-teacher='Ahmed Sami']")
     expect(sami.locator("li[data-rate='SAT private'] [data-amount]")).to_have_text("400 EGP / hour")
     expect(sami.locator("li[data-rate='SAT group'] [data-amount]")).to_have_text("600 EGP / hour")
