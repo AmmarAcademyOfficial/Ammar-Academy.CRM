@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "@fontsource-variable/inter";
 import "@fontsource-variable/noto-sans-arabic";
 import "./globals.css";
+import { HydrationMark } from "@/components/hydration-mark";
 
 export const metadata: Metadata = {
   title: "Ammar Academy CRM",
@@ -17,7 +18,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en">
-      <body className="min-h-dvh">{children}</body>
+      <body className="min-h-dvh">
+        {children}
+        <HydrationMark />
+      </body>
     </html>
   );
 }

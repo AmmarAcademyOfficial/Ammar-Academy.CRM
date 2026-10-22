@@ -15,6 +15,7 @@ import urllib.request
 from pathlib import Path
 
 from playwright.sync_api import expect, sync_playwright
+import hydration  # noqa: F401  (waits for the page to be interactive after each load)
 
 BASE = "http://localhost:3000"
 ROOT = Path(__file__).parents[2]

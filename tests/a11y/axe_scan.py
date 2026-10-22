@@ -8,16 +8,21 @@ import sys
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
+sys.path.insert(0, str(Path(__file__).parents[1] / "e2e"))
+import hydration  # noqa: F401,E402  (waits for the page to be interactive after each load)
 
 BASE = "http://localhost:3000"
 AXE = (Path(__file__).parents[2] / "node_modules/axe-core/axe.min.js").read_text()
 SCREENS = {
     "Hana Farouk": ["/overview", "/leads", "/payments", "/customers", "/reports", "/review", "/follow-ups",
                     "/settings/users", "/settings/shifts", "/settings/courses", "/settings/checklist",
-                    "/settings/payments", "/settings/sheets", "/settings/audit"],
+                    "/settings/payments", "/settings/sheets", "/settings/audit", "/settings/teachers", "/sessions",
+                    "/accounting", "/accounting?tab=payments", "/accounting?tab=customers", "/accounting?tab=agents", "/accounting?tab=teachers"],
     "Nour Hassan": ["/my-work", "/leads", "/follow-ups"],
-    "Laila Ibrahim": ["/my-work", "/customers", "/follow-ups"],
+    "Laila Ibrahim": ["/my-work", "/customers", "/follow-ups", "/sessions"],
+    "Karim Fawzy": ["/accounting", "/accounting?tab=teachers"],
 }
+NO_PANEL = {"Karim Fawzy"}  # accountants open customers from Accounting, not the lead list
 bad = 0
 total = 0
 with sync_playwright() as p:
@@ -27,7 +32,7 @@ with sync_playwright() as p:
         page.goto(f"{BASE}/login")
         page.get_by_role("button", name=person).click()
         page.wait_for_load_state("networkidle")
-        for path in paths + ["__panel__"]:
+        for path in paths + ([] if person in NO_PANEL else ["__panel__"]):
             if path == "__panel__":
                 page.goto(f"{BASE}/leads" if person != "Laila Ibrahim" else f"{BASE}/customers")
                 page.wait_for_load_state("networkidle")
