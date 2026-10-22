@@ -1,8 +1,9 @@
 import "server-only";
+import { randomUUID } from "node:crypto";
 import { normalizeHeader, type ColumnMapping, type RowIdentity } from "@/domain/sheet-mapping";
 import { parseRow, type Cell, type ParsedRow, type RowContext } from "@/domain/sheet-rows";
 import { decryptSecret } from "../crypto";
-import { asSystem, sql, type Tx } from "../db";
+import { asSystem, type Tx } from "../db";
 import { cleanupOrphanReceipts } from "../storage";
 import { accessTokenFor, forgetAccessToken, google, GoogleAuthError, GoogleNotFoundError, GoogleTransientError, type SpreadsheetInfo } from "../google";
 
@@ -240,45 +241,43 @@ export interface TickResult {
 /** Syncs every connection, then assigns waiting leads. Overlapping runs skip instead of piling up. */
 export async function runTick(): Promise<TickResult> {
   const started = Date.now();
-  const reserved = await sql().reserve();
+  // A lease in the database (not a session lock): if this instance stops mid-run, for example
+  // during a deploy, the lease simply expires and the next tick goes ahead.
+  const holder = randomUUID();
+  const [{ ok }] = await asSystem((tx) => tx<{ ok: boolean }[]>`select private.try_start_tick(${holder}, 360) as ok`);
+  if (!ok) return { ran: false, connections: [], assignment: null, ms: Date.now() - started, cleanup: null, alerts: null };
   try {
-    const [{ locked }] = await reserved<{ locked: boolean }[]>`select pg_try_advisory_lock(hashtext('crm.tick')) as locked`;
-    if (!locked) return { ran: false, connections: [], assignment: null, ms: Date.now() - started, cleanup: null, alerts: null };
-    try {
-      const conns = await asSystem((tx) => tx<{ id: string }[]>`
-        select c.id from public.sheet_connections c join public.google_accounts a on a.id = c.google_account_id
-        where c.status <> 'paused' and a.status = 'connected' order by c.created_at`);
-      const connections: SyncResult[] = [];
-      for (const { id } of conns) {
-        try {
-          connections.push(await syncConnection(id));
-        } catch (e) {
-          console.error("[sheets] connection sync failed", { id, error: (e as Error).message });
-          connections.push({ connectionId: id, status: "retry", message: "Unexpected error", imported: 0, resubmitted: 0, review: 0, failed: 0, remaining: 0 });
-        }
-      }
-      const [{ r }] = await asSystem((tx) => tx<{ r: TickResult["assignment"] }[]>`select private.assign_waiting(now()) as r`);
-      // Timed notifications: leads not opened in time, and follow-up reminders.
-      let alerts: TickResult["alerts"] = null;
+    const conns = await asSystem((tx) => tx<{ id: string }[]>`
+      select c.id from public.sheet_connections c join public.google_accounts a on a.id = c.google_account_id
+      where c.status <> 'paused' and a.status = 'connected' order by c.created_at`);
+    const connections: SyncResult[] = [];
+    for (const { id } of conns) {
       try {
-        [{ alerts }] = await asSystem((tx) => tx<{ alerts: TickResult["alerts"] }[]>`select private.send_timed_alerts(now()) as alerts`);
+        connections.push(await syncConnection(id));
       } catch (e) {
-        console.error("[alerts] timed alerts failed", (e as Error).message);
+        console.error("[sheets] connection sync failed", { id, error: (e as Error).message });
+        connections.push({ connectionId: id, status: "retry", message: "Unexpected error", imported: 0, resubmitted: 0, review: 0, failed: 0, remaining: 0 });
       }
-      // Housekeeping once an hour (the tick runs every 2 minutes, so exactly one run lands in minutes 0–1).
-      let cleanup: TickResult["cleanup"] = null;
-      if (new Date().getUTCMinutes() < 2) {
-        try {
-          cleanup = await cleanupOrphanReceipts();
-        } catch (e) {
-          console.error("[cleanup] receipts", (e as Error).message);
-        }
-      }
-      return { ran: true, connections, assignment: r, ms: Date.now() - started, cleanup, alerts };
-    } finally {
-      await reserved`select pg_advisory_unlock(hashtext('crm.tick'))`;
     }
+    const [{ r }] = await asSystem((tx) => tx<{ r: TickResult["assignment"] }[]>`select private.assign_waiting(now()) as r`);
+    // Timed notifications: leads not opened in time, and follow-up reminders.
+    let alerts: TickResult["alerts"] = null;
+    try {
+      [{ alerts }] = await asSystem((tx) => tx<{ alerts: TickResult["alerts"] }[]>`select private.send_timed_alerts(now()) as alerts`);
+    } catch (e) {
+      console.error("[alerts] timed alerts failed", (e as Error).message);
+    }
+    // Housekeeping once an hour (the tick runs every 2 minutes, so exactly one run lands in minutes 0–1).
+    let cleanup: TickResult["cleanup"] = null;
+    if (new Date().getUTCMinutes() < 2) {
+      try {
+        cleanup = await cleanupOrphanReceipts();
+      } catch (e) {
+        console.error("[cleanup] receipts", (e as Error).message);
+      }
+    }
+    return { ran: true, connections, assignment: r, ms: Date.now() - started, cleanup, alerts };
   } finally {
-    reserved.release();
+    await asSystem((tx) => tx`select private.end_tick(${holder})`).catch((e) => console.error("[tick] could not release the lease", (e as Error).message));
   }
 }
