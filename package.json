@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:db": "vitest run -c vitest.db.config.mts",
     "db:local": "node scripts/local-postgres.mjs --keep",
