@@ -8,6 +8,8 @@ import sys
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
+sys.path.insert(0, str(Path(__file__).parents[1] / "e2e"))
+import hydration  # noqa: F401,E402  (waits for the page to be interactive after each load)
 
 BASE = "http://localhost:3000"
 AXE = (Path(__file__).parents[2] / "node_modules/axe-core/axe.min.js").read_text()
