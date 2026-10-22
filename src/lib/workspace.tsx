@@ -76,12 +76,15 @@ export interface ApiState<T> {
  * Loads JSON from one of the app's API routes.
  * Refetches when the URL changes, after any successful change (dataVersion),
  * when the window regains focus, and every 60 seconds, so changes made by
- * other staff appear without a manual refresh.
+ * other staff appear without a manual refresh. `poll` changes the interval and can keep
+ * polling while the tab is in the background (used by the notification bell).
  */
-export function useApi<T>(url: string | null): ApiState<T> {
+export function useApi<T>(url: string | null, poll?: { everyMs?: number; whenHidden?: boolean }): ApiState<T> {
   const { dataVersion } = useWorkspace();
   const router = useRouter();
   const [tick, setTick] = useState(0);
+  const everyMs = poll?.everyMs ?? 60_000;
+  const whenHidden = poll?.whenHidden ?? false;
   const key = url ? `${url}#${dataVersion}#${tick}` : null;
   // Results are stored with the key they answer, so "loading" is derived instead of set in the effect.
   const [state, setState] = useState<{ key: string | null; data?: T; error?: string }>({ key: null });
@@ -109,12 +112,12 @@ export function useApi<T>(url: string | null): ApiState<T> {
     if (!url) return;
     const onFocus = () => setTick((t) => t + 1);
     window.addEventListener("focus", onFocus);
-    const t = setInterval(() => document.visibilityState === "visible" && setTick((x) => x + 1), 60_000);
+    const t = setInterval(() => (whenHidden || document.visibilityState === "visible") && setTick((x) => x + 1), everyMs);
     return () => {
       window.removeEventListener("focus", onFocus);
       clearInterval(t);
     };
-  }, [url]);
+  }, [url, everyMs, whenHidden]);
 
   // "loading" only when the question changed (new URL); background refreshes keep showing current data.
   const answeredUrl = state.key?.split("#")[0] ?? null;

@@ -231,6 +231,13 @@ export async function seedDev(admin) {
              or exists (select 1 from public.stages s where s.id = i.stage_id and s.is_closed))`);
   await q("update public.onboardings set support_opened_at = claimed_at where claimed_at is not null and support_opened_at is null");
 
+  // Same as the live data when step 2 notifications started: no burst of alerts for what was
+  // already there, and the seed's own "New lead" notifications are not kept (live had none).
+  await q("update public.inquiries set unopened_alert_at = now() where sales_owner_id is not null and owner_opened_at is null and unopened_alert_at is null");
+  await q("update public.follow_ups set reminded_at = now() where reminded_at is null and due_at <= now() + interval '15 minutes'");
+  await q("update public.support_follow_ups set reminded_at = now() where reminded_at is null and due_at <= now() + interval '15 minutes'");
+  await q("delete from public.notifications where kind = 'new_lead'");
+
   await q("update public.audit_log set created_at = now() - interval '2 days' where created_at > now() - interval '1 minute'");
   return ids;
 }

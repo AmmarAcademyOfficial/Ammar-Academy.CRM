@@ -191,6 +191,7 @@ export const mapSettings = (r: Row): Settings => ({
   handoverTrigger: r.handover_trigger as Settings["handoverTrigger"],
   depositRule: (r.deposit_rule ?? {}) as Settings["depositRule"],
   noteEditWindowMinutes: Number(r.note_edit_window_minutes),
+  unopenedAlertMinutes: Number(r.unopened_alert_minutes ?? 30),
 });
 
 export const mapLeadRow = (r: Row): LeadRowDTO => ({
@@ -265,6 +266,8 @@ export const mapNotification = (r: Row): AppNotification => ({
   inquiryId: strOpt(r.inquiry_id),
   createdAt: iso(r.created_at),
   read: r.read_at !== null && r.read_at !== undefined,
+  kind: strOpt(r.kind),
+  popup: Boolean(r.popup),
 });
 
 export const mapAudit = (r: Row): AuditEntry => ({ id: str(r.id), actorId: r.actor_id ? str(r.actor_id) : "system", action: str(r.action), target: str(r.target), createdAt: iso(r.created_at) });

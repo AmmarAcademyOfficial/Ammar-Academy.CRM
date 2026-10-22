@@ -6,6 +6,7 @@ import type { IneligibleReason } from "./rules";
 import type {
   Activity,
   AppNotification,
+  NotificationRule,
   AuditEntry,
   Course,
   CourseType,
@@ -53,6 +54,7 @@ export interface Reference {
   settings: Settings;
   savedViews: SavedView[];
   leadColumns: string[] | null;
+  notificationRules: NotificationRule[];
 }
 
 export interface LeadRowDTO {

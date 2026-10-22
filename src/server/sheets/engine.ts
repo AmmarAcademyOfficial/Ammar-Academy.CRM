@@ -233,6 +233,8 @@ export interface TickResult {
   assignment: { assigned: number; waiting: number; pauses_ended: number } | null;
   ms: number;
   cleanup: { checked: number; deleted: number } | null;
+  /** "Not opened yet" alerts and follow-up reminders sent this run. */
+  alerts: { unopened: number; reminders: number } | null;
 }
 
 /** Syncs every connection, then assigns waiting leads. Overlapping runs skip instead of piling up. */
@@ -241,7 +243,7 @@ export async function runTick(): Promise<TickResult> {
   const reserved = await sql().reserve();
   try {
     const [{ locked }] = await reserved<{ locked: boolean }[]>`select pg_try_advisory_lock(hashtext('crm.tick')) as locked`;
-    if (!locked) return { ran: false, connections: [], assignment: null, ms: Date.now() - started, cleanup: null };
+    if (!locked) return { ran: false, connections: [], assignment: null, ms: Date.now() - started, cleanup: null, alerts: null };
     try {
       const conns = await asSystem((tx) => tx<{ id: string }[]>`
         select c.id from public.sheet_connections c join public.google_accounts a on a.id = c.google_account_id
@@ -256,6 +258,13 @@ export async function runTick(): Promise<TickResult> {
         }
       }
       const [{ r }] = await asSystem((tx) => tx<{ r: TickResult["assignment"] }[]>`select private.assign_waiting(now()) as r`);
+      // Timed notifications: leads not opened in time, and follow-up reminders.
+      let alerts: TickResult["alerts"] = null;
+      try {
+        [{ alerts }] = await asSystem((tx) => tx<{ alerts: TickResult["alerts"] }[]>`select private.send_timed_alerts(now()) as alerts`);
+      } catch (e) {
+        console.error("[alerts] timed alerts failed", (e as Error).message);
+      }
       // Housekeeping once an hour (the tick runs every 2 minutes, so exactly one run lands in minutes 0–1).
       let cleanup: TickResult["cleanup"] = null;
       if (new Date().getUTCMinutes() < 2) {
@@ -265,7 +274,7 @@ export async function runTick(): Promise<TickResult> {
           console.error("[cleanup] receipts", (e as Error).message);
         }
       }
-      return { ran: true, connections, assignment: r, ms: Date.now() - started, cleanup };
+      return { ran: true, connections, assignment: r, ms: Date.now() - started, cleanup, alerts };
     } finally {
       await reserved`select pg_advisory_unlock(hashtext('crm.tick'))`;
     }

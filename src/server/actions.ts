@@ -235,6 +235,7 @@ export async function updateSettings(patch: Partial<Settings>): Promise<Result<v
       overdue_after_minutes: patch.overdueAfterMinutes,
       first_contact_target_minutes: patch.newLeadFirstContactTargetMinutes,
       note_edit_window_minutes: patch.noteEditWindowMinutes,
+      unopened_alert_minutes: patch.unopenedAlertMinutes,
       handover_trigger: patch.handoverTrigger,
       deposit_rule: patch.depositRule,
     };
@@ -401,6 +402,16 @@ export async function setColumns(keys: string[]): Promise<Result<void>> {
     await run((tx, me) => tx`
       insert into public.user_preferences (user_id, lead_columns, updated_at) values (${me}, ${cols}, now())
       on conflict (user_id) do update set lead_columns = excluded.lead_columns, updated_at = now()`);
+    refreshReference();
+  });
+}
+
+/** Manager: switch one notification type on or off for a role, and choose whether it pops up. */
+export async function setNotificationRule(event: string, role: Role, enabled: boolean, popup: boolean): Promise<Result<void>> {
+  return attempt(async () => {
+    const ev = check(z.string().regex(/^[a-z_]{1,40}$/), event);
+    const r = check(z.enum(["manager", "sales", "support"]), role);
+    await run((tx) => tx`select public.set_notification_rule(${ev}, ${r}, ${Boolean(enabled)}, ${Boolean(popup)})`);
     refreshReference();
   });
 }

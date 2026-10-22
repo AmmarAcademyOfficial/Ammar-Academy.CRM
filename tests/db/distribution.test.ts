@@ -282,7 +282,7 @@ describe("waiting queue and runs", () => {
     await waiting(prog, 30);
     await admin("select private.assign_waiting(now())");
     await admin("select private.assign_waiting(now() + interval '2 minutes')");
-    const notes = await admin<{ text: string }>("select text from public.notifications where user_id = $1 and text like '%ALERT%'", [manager.id]);
+    const notes = await admin<{ text: string }>("select text from public.notifications where user_id = $1 and kind = 'no_agent_on_shift' and text like '%ALERT%'", [manager.id]);
     expect(notes).toHaveLength(1);
     expect(notes[0].text).toMatch(/no sales agent is on shift for ALERT/);
   });

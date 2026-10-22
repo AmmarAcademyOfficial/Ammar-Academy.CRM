@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, LogOut, MoreHorizontal, Pause, Play } from "lucide-react";
+import { Bell, LogOut, MonitorSmartphone, MoreHorizontal, Pause, Play, Volume2, VolumeX } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -8,6 +8,7 @@ import type { NotificationList } from "@/domain/dto";
 import { ROLE_LABEL } from "@/domain/permissions";
 import { CAIRO_TZ, formatRelative } from "@/domain/rules";
 import { useRunAction } from "@/lib/run-action";
+import { requestDesktopAlerts, toggleSound } from "@/lib/chime";
 import { useApi, useWorkspace } from "@/lib/workspace";
 import { markNotificationsRead, setUserPaused } from "@/server/actions";
 import { signOut } from "@/server/auth-actions";
@@ -15,6 +16,7 @@ import { cn as clsx } from "../ui/cn";
 import { Avatar } from "../ui/misc";
 import { NAV } from "./nav";
 import { LogoWithLabel } from "../ui/logo";
+import { NotificationPopups, useDesktopAlertState, useSoundOn } from "./notification-popups";
 
 export function BrandMark() {
   return (
@@ -55,10 +57,11 @@ export function AvailabilityControl({ dark }: { dark?: boolean }) {
   );
 }
 
-function NotificationsMenu() {
+function NotificationsMenu({ data }: { data: NotificationList | undefined }) {
   const { now, openInquiry } = useWorkspace();
   const runAction = useRunAction();
-  const { data } = useApi<NotificationList>("/api/notifications");
+  const sound = useSoundOn();
+  const desktop = useDesktopAlertState();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const items = data?.items ?? [];
@@ -93,9 +96,20 @@ function NotificationsMenu() {
         <div className="absolute right-0 z-40 mt-2 w-[min(360px,calc(100vw-24px))] overflow-hidden rounded-xl border border-line bg-white shadow-[var(--shadow-panel)]">
           <div className="flex items-center justify-between border-b border-line px-4 py-2.5">
             <p className="text-sm font-semibold">Notifications</p>
-            {unread > 0 && (
-              <button className="text-xs font-medium text-navy-700 hover:underline" onClick={() => runAction(markNotificationsRead(), null)}>Mark all read</button>
-            )}
+            <span className="flex items-center gap-3">
+              {unread > 0 && (
+                <button className="text-xs font-medium text-navy-700 hover:underline" onClick={() => runAction(markNotificationsRead(), null)}>Mark all read</button>
+              )}
+              <button
+                onClick={toggleSound}
+                aria-pressed={sound}
+                aria-label={sound ? "Pop-up sound on. Turn off" : "Pop-up sound off. Turn on"}
+                title={sound ? "Sound on" : "Sound off"}
+                className="rounded-md p-1 text-muted hover:bg-navy-50 hover:text-ink"
+              >
+                {sound ? <Volume2 size={16} /> : <VolumeX size={16} />}
+              </button>
+            </span>
           </div>
           <ul className="max-h-96 overflow-y-auto">
             {items.length === 0 && <li className="px-4 py-8 text-center text-sm text-muted">You are all caught up.</li>}
@@ -117,6 +131,18 @@ function NotificationsMenu() {
               </li>
             ))}
           </ul>
+          {desktop !== "unsupported" && desktop !== "granted" && (
+            <div className="flex items-center gap-2 border-t border-line px-4 py-2.5 text-xs text-muted">
+              <MonitorSmartphone size={14} aria-hidden />
+              {desktop === "default" ? (
+                <button className="font-medium text-navy-700 hover:underline" onClick={() => requestDesktopAlerts()}>
+                  Turn on desktop alerts (when the CRM tab is in the background)
+                </button>
+              ) : (
+                <span>Desktop alerts are blocked in this browser&apos;s site settings.</span>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -129,6 +155,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const items = NAV[me.role];
   const isActive = (p: string) => path === p || path.startsWith(p + "/");
   const mobileItems = items.slice(0, items.length > 5 ? 4 : 5);
+  // Every 20 seconds, also in the background, so pop-ups and desktop alerts arrive quickly.
+  const { data: notifications } = useApi<NotificationList>("/api/notifications", { everyMs: 20_000, whenHidden: true });
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -172,7 +200,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <LogoWithLabel height={38} />
             </span>
             <div className="ml-auto flex items-center gap-1">
-              <NotificationsMenu />
+              <NotificationsMenu data={notifications} />
               <form action={signOut} className="lg:hidden">
                 <button type="submit" aria-label={`Sign out ${me.fullName}`} className="rounded-lg p-1">
                   <Avatar name={me.fullName} size={30} />
@@ -184,6 +212,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </div>
 
+      <NotificationPopups data={notifications} />
       <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-white pb-[env(safe-area-inset-bottom)] lg:hidden">
         {mobileItems.map(({ path: p, label, icon: Icon }) => (
           <Link key={p} href={p} aria-current={isActive(p) ? "page" : undefined} className={clsx("flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium", isActive(p) ? "text-navy-900" : "text-muted")}>

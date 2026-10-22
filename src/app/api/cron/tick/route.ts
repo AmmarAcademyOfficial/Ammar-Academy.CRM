@@ -26,6 +26,7 @@ async function handle(req: Request) {
       ms: r.ms,
       assignment: r.assignment,
       cleanup: r.cleanup,
+      alerts: r.alerts,
       connections: r.connections.map((c) => ({ id: c.connectionId, status: c.status, imported: c.imported, resubmitted: c.resubmitted, review: c.review, failed: c.failed, remaining: c.remaining })),
     });
   } catch (e) {

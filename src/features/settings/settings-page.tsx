@@ -30,6 +30,7 @@ import { AuditSettings } from "./audit-settings";
 import { ChecklistSettings } from "./checklist-settings";
 import { CoursesSettings } from "./courses-settings";
 import { FieldsSettings } from "./fields-settings";
+import { NotificationsSettings } from "./notifications-settings";
 import { SheetsSettings } from "./sheets-settings";
 import { ShiftsSettings } from "./shifts-settings";
 
@@ -40,7 +41,8 @@ const SECTIONS = [
   { id: "fields", label: "Customer Fields" },
   { id: "stages", label: "Stages and Contact Outcomes" },
   { id: "tags", label: "Tags and Colors" },
-  { id: "followups", label: "Follow-ups and Notifications" },
+  { id: "followups", label: "Follow-ups" },
+  { id: "notifications", label: "Notifications" },
   { id: "payments", label: "Payments and Handover" },
   { id: "checklist", label: "Support Checklist" },
   { id: "sheets", label: "Google Sheets Connections" },
@@ -85,6 +87,7 @@ export function SettingsPage({ section }: { section?: string }) {
           {current?.id === "stages" && <StagesSection />}
           {current?.id === "tags" && <TagsSection />}
           {current?.id === "followups" && <FollowUpSection />}
+          {current?.id === "notifications" && <NotificationsSettings />}
           {current?.id === "payments" && <PaymentsSection />}
           {current?.id === "checklist" && <ChecklistSettings />}
           {current?.id === "sheets" && <SheetsSettings />}
@@ -365,7 +368,7 @@ function TagsSection() {
 
 // ── Follow-ups and notifications ─────────────────────────────────────────
 
-function NumberSetting({ label, hint, value, onSave, unit }: { label: string; hint: string; value: number; onSave: (n: number) => void; unit: string }) {
+export function NumberSetting({ label, hint, value, onSave, unit }: { label: string; hint: string; value: number; onSave: (n: number) => void; unit: string }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
       <div className="text-sm"><p>{label}</p><p className="text-xs text-muted">{hint}</p></div>
@@ -384,9 +387,8 @@ function FollowUpSection() {
   const save = (patch: Partial<Settings>) => runAction(updateSettings(patch), "Setting saved", { reference: true });
   return (
     <Card>
-      <CardHeader title="Follow-ups and notifications" subtitle="In-app notifications only in version one." />
+      <CardHeader title="Follow-ups" subtitle="Follow-up reminders and other notifications are set in Settings → Notifications." />
       <div className="divide-y divide-line">
-        <NumberSetting label="Remind before a follow-up" hint="Notification to the owner before the due time (sent by the Phase 3 scheduler)" value={s.reminderMinutesBefore} unit="minutes" onSave={(n) => save({ reminderMinutesBefore: n })} />
         <NumberSetting label="Overdue after" hint="Grace period after the due time before it counts as overdue" value={s.overdueAfterMinutes} unit="minutes" onSave={(n) => save({ overdueAfterMinutes: n })} />
         <NumberSetting label="First-contact target for new leads" hint="Used to highlight slow responses on dashboards and reports" value={s.newLeadFirstContactTargetMinutes} unit="minutes" onSave={(n) => save({ newLeadFirstContactTargetMinutes: n })} />
         <NumberSetting label="Note edit window" hint="Authors can edit their notes for this long. Earlier versions are always kept." value={s.noteEditWindowMinutes} unit="minutes" onSave={(n) => save({ noteEditWindowMinutes: n })} />

@@ -390,6 +390,17 @@ export interface AppNotification {
   inquiryId?: ID;
   createdAt: Timestamp;
   read: boolean;
+  /** Notification type (see domain/notifications.ts). */
+  kind?: string;
+  /** Pops up with a sound when it arrives (decided by the notification rules). */
+  popup?: boolean;
+}
+
+export interface NotificationRule {
+  event: string;
+  role: Role;
+  enabled: boolean;
+  popup: boolean;
 }
 
 export interface AuditEntry {
@@ -443,4 +454,6 @@ export interface Settings {
   /** Per program: minimum confirmed amount (EGP) or percent of agreed total. null = not yet set. */
   depositRule: Record<ID, { kind: "amount" | "percent"; value: number } | null>;
   noteEditWindowMinutes: number;
+  /** Alert the owner and managers when an assigned lead is not opened after this long. 0 = off. */
+  unopenedAlertMinutes: number;
 }

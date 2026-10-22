@@ -106,7 +106,7 @@ with sync_playwright() as p:
     settle(m)
     for path in ["/overview", "/leads", "/payments", "/customers", "/reports", "/review", "/follow-ups", "/settings"]:
         visit(m, path)
-    for section in ["users", "shifts", "courses", "fields", "stages", "tags", "followups", "payments", "checklist", "sheets", "audit"]:
+    for section in ["users", "shifts", "courses", "fields", "stages", "tags", "followups", "notifications", "payments", "checklist", "sheets", "audit"]:
         visit(m, f"/settings/{section}")
     visit(m, "/settings/users"); open_and_close(m, "Add user"); open_and_close(m, "Set password")
     visit(m, "/settings/courses"); open_and_close(m, "Add course"); open_and_close(m, "Add type")

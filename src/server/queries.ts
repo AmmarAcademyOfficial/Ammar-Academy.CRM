@@ -2,7 +2,7 @@ import "server-only";
 import type postgres from "postgres";
 import type { FollowUpItem, LeadDetail, LeadPage, LeadQuery, LeadRowDTO, MyWork, NotificationList, Overview, Reference, WorkBucket } from "@/domain/dto";
 import { latinDigits, normalizePhone } from "@/domain/rules";
-import type { Activity, FieldValue, FollowUp, LeadFilters, SavedView } from "@/domain/types";
+import type { Activity, FieldValue, FollowUp, LeadFilters, Role, SavedView } from "@/domain/types";
 import type { Staff } from "./auth";
 import { asUser, type Tx } from "./db";
 import { eligibilityRows, openReviewCount, sheetHealth } from "./import-queries";
@@ -16,7 +16,7 @@ type Row = Record<string, unknown>;
 
 export async function loadReference(staff: Staff): Promise<Reference> {
   return asUser(staff.id, async (tx) => {
-    const [profiles, programs, courses, courseTypes, checklist, stages, outcomes, tags, fields, options, settings, views, prefs] = await Promise.all([
+    const [profiles, programs, courses, courseTypes, checklist, stages, outcomes, tags, fields, options, settings, views, prefs, rules] = await Promise.all([
       tx<Row[]>`select * from public.profiles order by role, rotation_order, full_name`,
       tx<Row[]>`select * from public.programs order by sort`,
       tx<Row[]>`select * from public.courses order by active desc, start_date nulls last, name`,
@@ -30,6 +30,7 @@ export async function loadReference(staff: Staff): Promise<Reference> {
       tx<Row[]>`select * from public.app_settings where id = 1`,
       tx<Row[]>`select * from public.saved_views where user_id = ${staff.id} order by created_at`,
       tx<Row[]>`select lead_columns from public.user_preferences where user_id = ${staff.id}`,
+      tx<Row[]>`select event, role, enabled, popup from public.notification_rules order by event, role`,
     ]);
     return {
       profiles: profiles.map(mapProfile),
@@ -44,6 +45,7 @@ export async function loadReference(staff: Staff): Promise<Reference> {
       settings: mapSettings(settings[0]),
       savedViews: views.map((v): SavedView => ({ id: String(v.id), name: String(v.name), builtIn: false, filters: withDefaults(v.filters as LeadFilters) })),
       leadColumns: (prefs[0]?.lead_columns as string[] | null) ?? null,
+      notificationRules: rules.map((r) => ({ event: String(r.event), role: r.role as Role, enabled: Boolean(r.enabled), popup: Boolean(r.popup) })),
     };
   });
 }

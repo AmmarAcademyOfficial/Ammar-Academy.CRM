@@ -51,7 +51,7 @@ const row = async (inq: string) =>
   (await admin<{ sales_owner_id: string | null; assignment_method: string | null; owner_opened_at: Date | null }>(
     "select sales_owner_id, assignment_method, owner_opened_at from public.inquiries where id = $1", [inq]))[0];
 const notes = async (user: TestUser) =>
-  (await admin<{ text: string; inquiry_id: string | null }>("select text, inquiry_id from public.notifications where user_id = $1 order by created_at", [user.id]));
+  (await admin<{ text: string; inquiry_id: string | null; kind: string }>("select text, inquiry_id, kind from public.notifications where user_id = $1 order by created_at", [user.id]));
 const rotation = async (program: string) =>
   (await admin<{ last_user_id: string | null }>("select last_user_id from public.rotation_state where program_id = $1", [program]))[0].last_user_id;
 
@@ -142,7 +142,7 @@ describe("returning customers go to their previous agent", () => {
     await admin("update public.profiles set active = false where id = $1", [prev.id]);
     const fresh = await inquiry(c, progX);
     expect(await assign(fresh)).toBe(onShift.id);
-    const m = (await notes(manager)).filter((x) => x.inquiry_id === fresh);
+    const m = (await notes(manager)).filter((x) => x.inquiry_id === fresh && x.kind === "previous_agent_inactive");
     expect(m).toHaveLength(1);
     expect(m[0].text).toContain("their previous agent Former Agent is no longer an active sales agent");
     await admin("update public.profiles set active = false where id = $1", [onShift.id]);
