@@ -20,13 +20,15 @@ import { KIND_LABEL, METHOD_LABEL, courseOf } from "@/lib/courses";
 import { toCsv } from "@/lib/csv";
 import { profileName } from "@/lib/lead-row";
 import { useApi, useWorkspace } from "@/lib/workspace";
+import { TeachersView } from "./teachers-view";
 
-type Tab = "overview" | "payments" | "customers" | "agents";
+type Tab = "overview" | "payments" | "customers" | "agents" | "teachers";
 const TABS: { id: Tab; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "payments", label: "Payments" },
   { id: "customers", label: "Customers" },
   { id: "agents", label: "Sales agents" },
+  { id: "teachers", label: "Teachers" },
 ];
 
 interface Filters {
@@ -62,7 +64,8 @@ export function AccountingPage() {
   const [f, setF] = useState<Filters>(NO_FILTERS);
   const range = periodRange(period, today, custom);
   const valid = !!range.from && !!range.to && range.from <= range.to;
-  const { data, loading, error } = useApi<AccountingData>(valid ? `/api/accounting?from=${range.from}&to=${range.to}` : null);
+  const teachersTab = tab === "teachers";
+  const { data, loading, error } = useApi<AccountingData>(valid && !teachersTab ? `/api/accounting?from=${range.from}&to=${range.to}` : null);
 
   const salesStaff = ref.profiles.filter((p) => p.role === "sales" || (p.role === "manager" && data?.customers.some((c) => c.salesAgentId === p.id)));
   const supportStaff = ref.profiles.filter((p) => p.role === "support");
@@ -81,9 +84,9 @@ export function AccountingPage() {
 
   return (
     <div>
-      <PageHeader title="Accounting" subtitle="Confirmed payments by the date the customer paid. Amounts in different currencies are never added together." />
+      <PageHeader title="Accounting" subtitle={teachersTab ? "Teacher salaries per Academy month (26th to 25th), from the session hours support records. Currencies are never added together." : "Confirmed payments by the date the customer paid. Amounts in different currencies are never added together."} />
 
-      <Card className="mb-4 p-3">
+      {!teachersTab && <Card className="mb-4 p-3">
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 [&>*]:min-w-0">
           <Select aria-label="Period" className="h-9" value={period} onChange={(e) => setPeriod(e.target.value as Period)}>
             {PERIODS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
@@ -128,7 +131,7 @@ export function AccountingPage() {
         {activeFilters > 0 && (
           <button className="mt-2 px-1 text-xs font-medium text-navy-700 hover:underline" onClick={() => setF(NO_FILTERS)}>Clear {activeFilters} filter{activeFilters === 1 ? "" : "s"}</button>
         )}
-      </Card>
+      </Card>}
 
       <div role="tablist" aria-label="Accounting views" className="mb-4 flex flex-wrap gap-2">
         {TABS.map((t) => (
@@ -139,9 +142,10 @@ export function AccountingPage() {
         ))}
       </div>
 
-      {!valid && <Card className="p-4 text-sm text-bad">Choose a start date before the end date.</Card>}
-      {error && <Card className="p-4 text-sm text-bad">{error}</Card>}
-      {valid && !data && loading && <Card><SkeletonRows rows={5} /></Card>}
+      {teachersTab && <TeachersView />}
+      {!teachersTab && !valid && <Card className="p-4 text-sm text-bad">Choose a start date before the end date.</Card>}
+      {!teachersTab && error && <Card className="p-4 text-sm text-bad">{error}</Card>}
+      {!teachersTab && valid && !data && loading && <Card><SkeletonRows rows={5} /></Card>}
       {data && tab === "overview" && <Overview payments={payments} customers={customers} range={range} />}
       {data && tab === "payments" && <PaymentsView payments={payments} range={range} />}
       {data && tab === "customers" && <CustomersView customers={customers} />}
