@@ -90,6 +90,11 @@ export function CoursesSettings() {
                     {c.capacity && <span className="inline-flex items-center gap-1"><Users size={12} aria-hidden />Up to {c.capacity}</span>}
                   </p>
                   {c.description && <p className="mt-1 line-clamp-2 text-sm text-ink/80" dir="auto">{c.description}</p>}
+                  {ref.groupTeachers.some((a) => a.courseId === c.id && !a.endedOn) && (
+                    <p className="mt-0.5 text-xs text-muted" data-course-teachers>
+                      Teacher: {ref.groupTeachers.filter((a) => a.courseId === c.id && !a.endedOn).map((a) => `${ref.teachers.find((t) => t.id === a.teacherId)?.fullName ?? "—"}${a.subject ? ` (${a.subject})` : ""}`).join(", ")}
+                    </p>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-[15px] font-semibold tabular-nums">{priceText(c)}</span>

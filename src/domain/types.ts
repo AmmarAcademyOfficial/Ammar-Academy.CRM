@@ -189,7 +189,8 @@ export type ActivityType =
   | "enrollment"
   | "support_assignment"
   | "support_follow_up"
-  | "payment_plan";
+  | "payment_plan"
+  | "teacher";
 
 export interface Activity {
   id: ID;
@@ -258,6 +259,42 @@ export interface PaymentSubmission {
 }
 
 export type PaymentKind = "deposit" | "installment" | "full";
+
+/** A teacher (a record, not a login). */
+export interface Teacher {
+  id: ID;
+  fullName: string;
+  phone?: string;
+  email?: string;
+  programIds: ID[];
+  active: boolean;
+  notes?: string;
+}
+
+/** A named hourly rate of one teacher. `amounts` is empty for staff who may not see pay. */
+export interface TeacherRate {
+  id: ID;
+  teacherId: ID;
+  name: string;
+  currency: string;
+  archived: boolean;
+  /** Amount per hour from each date, newest first. */
+  amounts: { amount: number; validFrom: string }[];
+}
+
+/** A teacher and rate for a private customer (enrollment) or a group course. */
+export interface TeacherAssignment {
+  id: ID;
+  teacherId: ID;
+  rateId: ID;
+  enrollmentId?: ID;
+  courseId?: ID;
+  subject?: string;
+  startedOn: string;
+  endedOn?: string;
+  customerName?: string;
+  inquiryId?: ID;
+}
 
 export type PaymentDueStatus = "paid" | "partly_paid" | "upcoming" | "due_today" | "overdue";
 

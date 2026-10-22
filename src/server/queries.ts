@@ -6,7 +6,7 @@ import type { Activity, FieldValue, FollowUp, LeadFilters, Role, SavedView } fro
 import type { Staff } from "./auth";
 import { asUser, type Tx } from "./db";
 import { eligibilityRows, openReviewCount, sheetHealth } from "./import-queries";
-import { mapActivity, mapAudit, mapChecklistItem, mapCourse, mapCourseType, mapEnrollment, mapField, mapFollowUp, mapLeadRow, mapNotification, mapOnboarding, mapOutcome, mapPayment, mapPaymentDue, mapProfile, mapProgram, mapSettings, mapStage, mapSupportFollowUp, mapTag } from "./mappers";
+import { mapActivity, mapAudit, mapChecklistItem, mapCourse, mapCourseType, mapEnrollment, mapField, mapFollowUp, mapLeadRow, mapNotification, mapOnboarding, mapOutcome, mapPayment, mapPaymentDue, mapProfile, mapTeacher, mapTeacherAssignment, mapProgram, mapSettings, mapStage, mapSupportFollowUp, mapTag } from "./mappers";
 import { withDefaults } from "@/domain/filters";
 
 type Frag = postgres.Fragment;
@@ -16,7 +16,7 @@ type Row = Record<string, unknown>;
 
 export async function loadReference(staff: Staff): Promise<Reference> {
   return asUser(staff.id, async (tx) => {
-    const [profiles, programs, courses, courseTypes, checklist, stages, outcomes, tags, fields, options, settings, views, prefs, rules] = await Promise.all([
+    const [profiles, programs, courses, courseTypes, checklist, stages, outcomes, tags, fields, options, settings, views, prefs, rules, teachers, rates, groupTeachers] = await Promise.all([
       tx<Row[]>`select * from public.profiles order by role, rotation_order, full_name`,
       tx<Row[]>`select * from public.programs order by sort`,
       tx<Row[]>`select * from public.courses order by active desc, start_date nulls last, name`,
@@ -31,6 +31,13 @@ export async function loadReference(staff: Staff): Promise<Reference> {
       tx<Row[]>`select * from public.saved_views where user_id = ${staff.id} order by created_at`,
       tx<Row[]>`select lead_columns from public.user_preferences where user_id = ${staff.id}`,
       tx<Row[]>`select event, role, enabled, popup from public.notification_rules order by event, role`,
+      tx<Row[]>`select * from public.teachers order by active desc, full_name`,
+      // Amounts come back only for managers and accountants (row-level security).
+      tx<Row[]>`
+        select r.*, coalesce((select json_agg(json_build_object('amount', a.amount, 'valid_from', a.valid_from) order by a.valid_from desc)
+                              from public.teacher_rate_amounts a where a.rate_id = r.id), '[]') as amounts
+        from public.teacher_rates r order by r.archived, r.name`,
+      tx<Row[]>`select * from public.teacher_assignments where course_id is not null order by ended_on nulls first, started_on desc`,
     ]);
     return {
       profiles: profiles.map(mapProfile),
@@ -46,6 +53,12 @@ export async function loadReference(staff: Staff): Promise<Reference> {
       savedViews: views.map((v): SavedView => ({ id: String(v.id), name: String(v.name), builtIn: false, filters: withDefaults(v.filters as LeadFilters) })),
       leadColumns: (prefs[0]?.lead_columns as string[] | null) ?? null,
       notificationRules: rules.map((r) => ({ event: String(r.event), role: r.role as Role, enabled: Boolean(r.enabled), popup: Boolean(r.popup) })),
+      teachers: teachers.map(mapTeacher),
+      teacherRates: rates.map((r) => ({
+        id: String(r.id), teacherId: String(r.teacher_id), name: String(r.name), currency: String(r.currency), archived: Boolean(r.archived),
+        amounts: (r.amounts as { amount: number; valid_from: string }[]).map((a) => ({ amount: Number(a.amount), validFrom: String(a.valid_from).slice(0, 10) })),
+      })),
+      groupTeachers: groupTeachers.map(mapTeacherAssignment),
     };
   });
 }
@@ -192,7 +205,7 @@ export async function getLeadDetail(staff: Staff, id: string): Promise<LeadDetai
     const row = mapLeadRow(rows[0]);
     row.inquiry.customFields = fieldValues;
     const detail: LeadDetail = {
-      row, activities, followUps: fus.map(mapFollowUp), fieldValues, payments: [], dues: [], supportFollowUps: [],
+      row, activities, followUps: fus.map(mapFollowUp), fieldValues, payments: [], dues: [], teachers: [], supportFollowUps: [],
       earlier: earlier.map((e) => ({
         inquiryId: String(e.inquiry_id), programCode: String(e.program_code), createdAt: new Date(e.created_at as string).toISOString(),
         ownerName: e.owner_name ? String(e.owner_name) : null, stageLabel: String(e.stage_label), visible: Boolean(e.visible),
@@ -200,11 +213,13 @@ export async function getLeadDetail(staff: Staff, id: string): Promise<LeadDetai
     };
     if (enr[0]) {
       const e = mapEnrollment(enr[0]);
-      const [pays, onb, dues] = await Promise.all([
+      const [pays, onb, dues, teach] = await Promise.all([
         tx<Row[]>`select * from public.payments where enrollment_id = ${e.id} order by submitted_at desc`,
         tx<Row[]>`select * from public.onboardings where enrollment_id = ${e.id}`,
         tx<Row[]>`select * from public.payment_dues_view(${e.id})`,
+        tx<Row[]>`select * from public.teacher_assignments where enrollment_id = ${e.id} order by ended_on nulls first, started_on desc`,
       ]);
+      detail.teachers = teach.map(mapTeacherAssignment);
       detail.enrollment = e;
       detail.payments = pays.map(mapPayment);
       detail.dues = dues.map(mapPaymentDue);

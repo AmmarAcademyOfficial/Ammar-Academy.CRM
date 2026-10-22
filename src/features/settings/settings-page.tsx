@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDown, ArrowUp, BarChart3, ChevronRight, FileWarning, KeyRound, Lock, Plus, UserPlus } from "lucide-react";
+import { ArrowDown, ArrowUp, BarChart3, Calculator, ChevronRight, FileWarning, KeyRound, Lock, Plus, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { StageBadge, TAG_COLORS, TagChip } from "@/components/ui/badges";
@@ -33,11 +33,13 @@ import { FieldsSettings } from "./fields-settings";
 import { NotificationsSettings } from "./notifications-settings";
 import { SheetsSettings } from "./sheets-settings";
 import { ShiftsSettings } from "./shifts-settings";
+import { TeachersSettings } from "./teachers-settings";
 
 const SECTIONS = [
   { id: "users", label: "Users and Roles" },
   { id: "shifts", label: "Shifts and Distribution" },
   { id: "courses", label: "Courses and Prices" },
+  { id: "teachers", label: "Teachers and Rates" },
   { id: "fields", label: "Customer Fields" },
   { id: "stages", label: "Stages and Contact Outcomes" },
   { id: "tags", label: "Tags and Colors" },
@@ -55,6 +57,7 @@ export function SettingsPage({ section }: { section?: string }) {
     <div>
       <PageHeader title="Settings" subtitle="Manager-only configuration. Changes here apply to everyone." />
       <div className="mb-4 grid grid-cols-2 gap-2 lg:hidden">
+        <Link href="/accounting" className="flex items-center gap-2 rounded-xl border border-line bg-white px-3 py-3 text-sm font-medium"><Calculator size={16} aria-hidden /> Accounting</Link>
         <Link href="/reports" className="flex items-center gap-2 rounded-xl border border-line bg-white px-3 py-3 text-sm font-medium"><BarChart3 size={16} aria-hidden /> Reports</Link>
         <Link href="/review" className="flex items-center gap-2 rounded-xl border border-line bg-white px-3 py-3 text-sm font-medium"><FileWarning size={16} aria-hidden /> Needs Review</Link>
       </div>
@@ -83,6 +86,7 @@ export function SettingsPage({ section }: { section?: string }) {
           {current?.id === "users" && <UsersSection />}
           {current?.id === "shifts" && <ShiftsSettings />}
           {current?.id === "courses" && <CoursesSettings />}
+          {current?.id === "teachers" && <TeachersSettings />}
           {current?.id === "fields" && <FieldsSettings />}
           {current?.id === "stages" && <StagesSection />}
           {current?.id === "tags" && <TagsSection />}

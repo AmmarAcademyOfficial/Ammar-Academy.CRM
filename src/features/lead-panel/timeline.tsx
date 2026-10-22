@@ -34,6 +34,7 @@ const ICON: Record<ActivityType, LucideIcon> = {
   field_change: PencilLine,
   reservation: BookmarkCheck,
   payment_plan: CalendarRange,
+  teacher: GraduationCap,
 };
 
 export function Timeline({ activities, readOnly }: { activities: Activity[]; readOnly?: boolean }) {

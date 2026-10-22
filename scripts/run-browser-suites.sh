@@ -13,7 +13,7 @@ mkdir -p "$LOGS"
 export DATABASE_URL=postgres://postgres:postgres@localhost:54329/crm AUTH_MODE=local LOCAL_AUTH_SECRET=local-test-secret-not-real-0000 \
   APP_URL=http://localhost:3000 GOOGLE_MODE=fake CRON_SECRET=local-cron-secret-for-tests-only-0000 FAKE_GOOGLE_FILE="$PWD/.local/fake-google.json"
 # The development-mode console scan runs first, on a clean development cache.
-SUITES=${*:-"console phase2 phase3 phase4 phase5 passwords step1 step2 accounting1 accounting2 a11y"}
+SUITES=${*:-"console phase2 phase3 phase4 phase5 passwords step1 step2 accounting1 accounting2 accounting3 a11y"}
 DB_PID="" APP_PID=""
 
 # Stops a process and its children. Next.js runs the server in a child process; leaving it behind

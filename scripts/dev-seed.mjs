@@ -212,6 +212,18 @@ export async function seedDev(admin) {
   const eTarek = await enroll(ids.youssef, tarek, courses.satPrivate, 9500);
   await decide(await pay(ids.youssef, eTarek, 2000, "instapay", "IPN-00000000", fakeReceipt()), "rejected", "Reference not found in the bank statement");
 
+  // Teachers and hourly rates; a group teacher for the SAT full course, a private teacher for Sara.
+  const teacher = async (full_name, program_ids, rates) => {
+    const [{ id }] = await asUser(manager, "select public.save_teacher($1) as id", [{ full_name, program_ids, phone: "+20 100 000 0000" }]);
+    const ids2 = {};
+    for (const [name, amount] of rates) ids2[name] = (await asUser(manager, "select public.add_teacher_rate($1) as id", [{ teacher_id: id, name, amount, currency: "EGP", valid_from: "2026-09-26" }]))[0].id;
+    return { id, rates: ids2 };
+  };
+  const tSami = await teacher("Ahmed Sami", [programs.SAT], [["SAT private", 400], ["SAT group", 600]]);
+  const tDina = await teacher("Dina Kamal", [programs.IELTS], [["IELTS private", 450]]);
+  await asUser(manager, "select public.assign_teacher($1)", [{ teacher_id: tSami.id, rate_id: tSami.rates["SAT group"], course_id: courses.satFull, subject: "Math", started_on: "2026-10-01" }]);
+  await asUser(manager, "select public.assign_teacher($1)", [{ teacher_id: tDina.id, rate_id: tDina.rates["IELTS private"], enrollment_id: eSara, started_on: "2026-10-15" }]);
+
   // Courses of interest on a few more leads.
   await asUser(ids.nour, "select public.set_inquiry_course($1, $2)", [await inquiryOf("Nadine Wahba"), courses.ieltsAcademic]);
   await asUser(ids.nour, "select public.set_inquiry_course($1, $2)", [await inquiryOf("Omar Farid"), courses.satIntensive]);

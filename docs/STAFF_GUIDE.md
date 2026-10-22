@@ -42,6 +42,7 @@ You see only your own leads. You cannot confirm payments or reassign leads.
 - Each customer shows the **balance left**. Open the customer → **Payments** → **Record payment**: choose the type (*Deposit*, *Installment*, *Full payment*), amount, date, method, reference, and attach the receipt screenshot or PDF. A manager confirms it before it counts, as for sales.
 - After a partial payment, fill in **Next payment** (date and amount) so you are reminded. You can also use **Add expected payment** in the **Payment plan**, and change or remove planned payments.
 - Each planned payment shows *Upcoming*, *Due today*, *Partly paid*, *Paid* or *Overdue*. Confirmed payments recorded after the plan was set count toward it, earliest date first.
+- **Teachers** (Support tab): **Assign teacher** picks the teacher, one of their rates and, if needed, the subject (a customer can have one teacher for Math and another for Reading). **Stop** ends a teacher from today; they stay on record. Group course teachers are shown too; managers assign those.
 - **My Work → Payments due** lists overdue payments and those due in the next 7 days. You get a notification the day before a payment is due, and the morning after if it is not paid (then weekly). Managers are told about overdue payments too.
 
 You see handed-over customers only (the queue and your own), never sales prospects.
@@ -72,6 +73,7 @@ You are notified when a payment is submitted for review and when a planned payme
   - *First contact* counts only the agent's scheduled shift time, so a lead arriving at night is not counted against them.
   - *Enrollments* are counted once, when the qualifying payment is confirmed and the customer is handed over.
   - *Confirmed payments* exclude pending, rejected and reversed payments.
+- **Settings → Teachers and Rates**: add teachers (programs they teach, contact details) and their hourly rates (for example *SAT private* 400 EGP, *SAT group* 600 EGP). **Change amount** sets a new amount from a date, usually the next 26th; hours before it keep the old amount. Archive a rate instead of deleting it. **Assign to a group course** sets the group's teacher. Each change is in the audit history.
 - **Settings → Notifications**: for each type of notification and each role, switch it on or off and choose **Pop-up and sound**. Managers get one for every new lead and for each lead not opened in time. Set the follow-up reminder time and the not-opened alert time (0 turns it off) under **Timing**.
 - **Settings → Audit History**: who changed what (roles, reassignments, prices, payment decisions, settings).
 

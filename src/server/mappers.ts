@@ -13,6 +13,8 @@ import type {
   Onboarding,
   PaymentDue,
   PaymentSubmission,
+  Teacher,
+  TeacherAssignment,
   SupportFollowUp,
   FieldDefinition,
   FollowUp,
@@ -122,6 +124,35 @@ export const mapPayment = (r: Row): PaymentSubmission => ({
   reversedAt: isoOpt(r.reversed_at),
   reversalReason: strOpt(r.reversal_reason),
   kind: (r.kind as PaymentSubmission["kind"]) ?? undefined,
+});
+
+const dayOf = (v: unknown): string | undefined => {
+  if (v === null || v === undefined) return undefined;
+  if (v instanceof Date) return `${v.getFullYear()}-${String(v.getMonth() + 1).padStart(2, "0")}-${String(v.getDate()).padStart(2, "0")}`;
+  return String(v).slice(0, 10);
+};
+
+export const mapTeacher = (r: Row): Teacher => ({
+  id: str(r.id),
+  fullName: str(r.full_name),
+  phone: strOpt(r.phone),
+  email: strOpt(r.email),
+  programIds: ((r.program_ids as string[] | null) ?? []).map(String),
+  active: Boolean(r.active),
+  notes: strOpt(r.notes),
+});
+
+export const mapTeacherAssignment = (r: Row): TeacherAssignment => ({
+  id: str(r.id),
+  teacherId: str(r.teacher_id),
+  rateId: str(r.rate_id),
+  enrollmentId: strOpt(r.enrollment_id),
+  courseId: strOpt(r.course_id),
+  subject: strOpt(r.subject),
+  startedOn: dayOf(r.started_on)!,
+  endedOn: dayOf(r.ended_on),
+  customerName: strOpt(r.customer_name),
+  inquiryId: strOpt(r.inquiry_id),
 });
 
 export const mapPaymentDue = (r: Row): PaymentDue => ({

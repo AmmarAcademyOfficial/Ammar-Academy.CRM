@@ -6,6 +6,9 @@ import type { IneligibleReason } from "./rules";
 import type {
   Activity,
   AppNotification,
+  Teacher,
+  TeacherAssignment,
+  TeacherRate,
   PaymentDue,
   NotificationRule,
   AuditEntry,
@@ -56,6 +59,10 @@ export interface Reference {
   savedViews: SavedView[];
   leadColumns: string[] | null;
   notificationRules: NotificationRule[];
+  teachers: Teacher[];
+  teacherRates: TeacherRate[];
+  /** Who teaches each group course (current and past). */
+  groupTeachers: TeacherAssignment[];
 }
 
 export interface LeadRowDTO {
@@ -92,6 +99,8 @@ export interface LeadDetail {
   totals?: PaymentTotalsDTO;
   /** The customer's payment plan, earliest first. */
   dues: PaymentDue[];
+  /** The customer's private teachers (current first). */
+  teachers: TeacherAssignment[];
   onboarding?: Onboarding;
   supportFollowUps: SupportFollowUp[];
   activities: Activity[];

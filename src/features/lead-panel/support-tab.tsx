@@ -15,6 +15,7 @@ import { useRunAction } from "@/lib/run-action";
 import { useWorkspace } from "@/lib/workspace";
 import { assignCustomer, claimCustomer, clearCustomerFlag, completeSupportFollowUp, createSupportFollowUp, setChecklistItem, setSupportStatus } from "@/server/payment-actions";
 import { cairoLocalInput, fromCairoLocal } from "./dialogs";
+import { TeachersSection } from "./teachers-section";
 
 export function SupportTab({ detail }: { detail: LeadDetail }) {
   const { me, ref, now } = useWorkspace();
@@ -47,6 +48,8 @@ export function SupportTab({ detail }: { detail: LeadDetail }) {
           {me.role === "manager" && <Button size="sm" onClick={() => setModal("assign")}>{ob.supportOwnerId ? "Reassign" : "Assign"}</Button>}
         </div>
       </section>
+
+      <TeachersSection detail={detail} canWork={canWork} />
 
       <section>
         <div className="mb-2 flex items-center justify-between gap-3">
