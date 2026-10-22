@@ -10,6 +10,8 @@ Runs against the production build and a freshly seeded local database:
   python3 tests/e2e/accounting5_e2e.py [screenshot_dir]
 Synthetic data only.
 """
+import csv as csvmod
+import io
 import json
 import subprocess
 import sys
@@ -134,10 +136,14 @@ with sync_playwright() as p:
 
     with a.expect_download() as dl:
         a.get_by_role("button", name="Export CSV").click()
-    csv = Path(dl.value.path()).read_text(encoding="utf-8")
-    check("CSV export lists lines, adjustments and totals",
-          dl.value.suggested_filename == f"salaries-{P}.csv" and "Dina Kamal,IELTS private,2,1,450,EGP,900" in csv and "Bonus: Extra mock exam" in csv and "Ahmed Sami,Total,,,,EGP,1150" in csv,
-          dl.value.suggested_filename)
+    rows = list(csvmod.reader(io.StringIO(Path(dl.value.path()).read_text(encoding="utf-8-sig"))))
+    check("CSV export lists pay lines, adjustments and totals",
+          dl.value.suggested_filename == f"salaries-{P}.csv"
+          and ["Dina Kamal", "Pay", "IELTS private", "2", "1", "450", "EGP", "900"] in rows
+          and ["Dina Kamal", "Bonus", "Extra mock exam", "", "", "", "EGP", "150"] in rows
+          and ["Ahmed Sami", "Deduction", "Started a class late", "", "", "", "EGP", "50"] in rows
+          and ["Ahmed Sami", "Total", "Pay + bonuses − deductions", "", "", "", "EGP", "1150"] in rows,
+          f"{dl.value.suggested_filename}, {len(rows)} rows")
 
     # ── 2. Manager: unrecorded sessions block closing; close; reopen ───────
     sql("""insert into public.teacher_sessions (assignment_id, teacher_id, rate_id, enrollment_id, starts_at, planned_hours, status)

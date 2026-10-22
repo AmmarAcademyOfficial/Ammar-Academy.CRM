@@ -56,11 +56,12 @@ export function TeachersView() {
 
   const exportCsv = () => {
     if (!r) return;
-    const rows: unknown[][] = [["Teacher", "Line", "Hours", "Sessions", "Per hour", "Currency", "Amount"]];
+    // Amounts stay positive (a leading minus would be escaped as text by the CSV safety rule); Type says how each line counts.
+    const rows: unknown[][] = [["Teacher", "Type", "Line", "Hours", "Sessions", "Per hour", "Currency", "Amount"]];
     for (const t of r.teachers) {
-      for (const l of t.lines) rows.push([t.name, l.rateName, l.hours, l.sessions, l.perHour ?? "", l.currency, l.amount ?? ""]);
-      for (const a of t.adjustments) rows.push([t.name, `${a.kind === "bonus" ? "Bonus" : "Deduction"}: ${a.note}`, "", "", "", a.currency, a.kind === "bonus" ? a.amount : -a.amount]);
-      for (const [c, a] of Object.entries(t.totals)) rows.push([t.name, "Total", "", "", "", c, a]);
+      for (const l of t.lines) rows.push([t.name, "Pay", l.rateName, l.hours, l.sessions, l.perHour ?? "", l.currency, l.amount ?? ""]);
+      for (const a of t.adjustments) rows.push([t.name, a.kind === "bonus" ? "Bonus" : "Deduction", a.note, "", "", "", a.currency, a.amount]);
+      for (const [c, a] of Object.entries(t.totals)) rows.push([t.name, "Total", "Pay + bonuses − deductions", "", "", "", c, a]);
     }
     download(`salaries-${r.month}.csv`, rows);
   };

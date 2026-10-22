@@ -229,7 +229,7 @@ function DailyChart({ payments, range, currency }: { payments: AccountingPayment
       <CardHeader title={`Money in per day (${currency})`} subtitle={shown ? `${formatDay(shown)}: ${formatMoney(byDay.get(shown) ?? 0, currency)}` : `${formatMoney(total, currency)} confirmed in ${days.length} day${days.length === 1 ? "" : "s"} · hover a day for its total`} />
       {max === 0 ? <p className="px-4 py-6 text-sm text-muted">No confirmed {currency} payments in this period.</p> : (
         <div className="px-4 pb-4 pt-3">
-          <div className="relative" style={{ height: H }} role="img" aria-label={`Money in per day, ${currency}: ${formatMoney(total, currency)} in total, highest day ${formatMoney(max, currency)}`}>
+          <div className="relative" style={{ height: H }} role="group" aria-label={`Money in per day, ${currency}: ${formatMoney(total, currency)} in total, highest day ${formatMoney(max, currency)}`}>
             <div className="absolute inset-x-0 top-0 border-t border-dashed border-line" aria-hidden />
             <span className="absolute right-0 top-0 -translate-y-full pb-0.5 text-[11px] text-muted" aria-hidden>{formatMoney(max, currency)}</span>
             <div className="absolute inset-x-0 bottom-0 border-t border-line" aria-hidden />
