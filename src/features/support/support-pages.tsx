@@ -1,14 +1,14 @@
 "use client";
 
 import { isUnopenedCustomer } from "@/lib/lead-row";
-import { AlertTriangle, CalendarClock, CheckCircle2, Hand, Inbox, ListChecks, Search, Users } from "lucide-react";
+import { AlertTriangle, Banknote, CalendarClock, CheckCircle2, Hand, Inbox, ListChecks, Search, Users } from "lucide-react";
 import { useState } from "react";
-import { SupportStatusBadge, NewBadge } from "@/components/ui/badges";
+import { DueBadge, SupportStatusBadge, NewBadge } from "@/components/ui/badges";
 import { Button } from "@/components/ui/button";
 import { cn as clsx } from "@/components/ui/cn";
 import { Checkbox, Input, Select } from "@/components/ui/form";
 import { Card, CardHeader, EmptyState, Name, PageHeader, PhoneText, SkeletonRows, Stat } from "@/components/ui/misc";
-import type { CustomerRow, SupportWork } from "@/domain/dto";
+import type { CustomerRow, PaymentDueRow, SupportWork } from "@/domain/dto";
 import { cairoParts, formatCairo, formatMoney, formatRelative } from "@/domain/rules";
 import { courseOf } from "@/lib/courses";
 import { profileName } from "@/lib/lead-row";
@@ -33,10 +33,17 @@ function CustomerLine({ c, action }: { c: CustomerRow; action?: React.ReactNode 
         </span>
         <span className="mt-0.5 block text-xs text-muted">
           {courseOf(ref, c.courseId)?.name ?? "—"} · <PhoneText value={c.phone} /> · {formatMoney(c.totals.paid, c.currency)} of {formatMoney(c.totals.agreed, c.currency)} paid
+          {c.totals.balance > 0 && <> · <span className="font-medium text-ink">{formatMoney(c.totals.balance, c.currency)} left</span></>}
         </span>
         <span className="mt-0.5 flex flex-wrap gap-x-3 text-xs">
           <span className="text-muted">Checklist {done}/{total}</span>
           {c.nextDue && <span className={overdue ? "font-medium text-bad" : "text-muted"}>{overdue ? "Overdue: " : "Next: "}{c.nextDue.label} · {formatCairo(c.nextDue.dueAt, "date")}</span>}
+          {c.nextPayment && (
+            <span className={c.nextPayment.status === "overdue" ? "font-medium text-bad" : "text-muted"} data-next-payment={c.nextPayment.status}>
+              {c.nextPayment.status === "overdue" ? "Payment overdue: " : "Next payment: "}
+              {formatMoney(c.nextPayment.amount - c.nextPayment.covered, c.currency)} · {formatCairo(c.nextPayment.dueOn, "date")}
+            </span>
+          )}
           {!c.onboarding.supportOwnerId && <span className="text-muted">Waiting {formatRelative(c.onboarding.createdAt, now).replace(" ago", "")}</span>}
         </span>
       </button>
@@ -97,6 +104,8 @@ export function SupportMyWork() {
           )}
         </Card>
 
+        <PaymentsDueCard owner="mine" className="xl:col-span-2" />
+
         <Card className="xl:col-span-2">
           <CardHeader title="My customers" count={data?.mine.length} subtitle="Onboarding in progress (Active customers are on the Customers page)" />
           {!data && loading ? <SkeletonRows rows={3} /> : data?.mine.length === 0 ? (
@@ -154,6 +163,7 @@ export function CustomersPage() {
         </Select>
         <div className="flex items-center px-1"><Checkbox label="Flagged for review only" checked={flagged} onChange={setFlagged} /></div>
       </Card>
+      {me.role === "manager" && <PaymentsDueCard owner={owner === "unclaimed" || owner === "mine" ? "any" : owner} className="mb-4" />}
       <Card>
         {!data && loading ? <SkeletonRows rows={4} /> : data?.length === 0 ? (
           <EmptyState icon={<Users size={22} />} title="No customers match">Customers appear here when a manager confirms a qualifying payment.</EmptyState>
@@ -189,5 +199,38 @@ export function SupportFollowUps() {
         )}
       </Card>
     </div>
+  );
+}
+
+/** Planned payments that are overdue or due in the next 7 days (support: their customers; managers: everyone or one agent's). */
+export function PaymentsDueCard({ owner, className }: { owner: string; className?: string }) {
+  const { ref, me, openInquiry } = useWorkspace();
+  const { data, loading } = useApi<PaymentDueRow[]>(`/api/payment-dues?days=7&owner=${encodeURIComponent(owner)}`);
+  const overdue = data?.filter((d) => d.status === "overdue").length ?? 0;
+  return (
+    <Card className={className}>
+      <CardHeader
+        title="Payments due"
+        count={data?.length}
+        subtitle={overdue ? `${overdue} overdue · the rest due in the next 7 days` : "Overdue and due in the next 7 days, from each customer's payment plan"}
+      />
+      {!data && loading ? <SkeletonRows rows={2} /> : data?.length === 0 ? (
+        <EmptyState icon={<Banknote size={20} />} title="No payments due">Planned payments show here a week before they are due.</EmptyState>
+      ) : (
+        <ul className="divide-y divide-line" aria-label="Payments due">
+          {data?.map((d) => (
+            <li key={d.id} data-due={d.status}>
+              <button className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-left text-sm hover:bg-navy-50/60" onClick={() => openInquiry(d.inquiryId)}>
+                <Name className="min-w-0 flex-1 font-medium">{d.customerName}</Name>
+                <span className="font-semibold tabular-nums">{formatMoney(d.amount - d.covered, d.currency)}</span>
+                <span className="w-24 text-xs text-muted">{formatCairo(d.dueOn, "date")}</span>
+                <DueBadge status={d.status} />
+                {me.role === "manager" && <span className="w-32 truncate text-xs text-muted">{d.supportOwnerId ? profileName(ref, d.supportOwnerId) : "No support owner"}</span>}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
   );
 }

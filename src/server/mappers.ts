@@ -11,6 +11,7 @@ import type {
   CourseType,
   Enrollment,
   Onboarding,
+  PaymentDue,
   PaymentSubmission,
   SupportFollowUp,
   FieldDefinition,
@@ -120,6 +121,19 @@ export const mapPayment = (r: Row): PaymentSubmission => ({
   reversedById: strOpt(r.reversed_by),
   reversedAt: isoOpt(r.reversed_at),
   reversalReason: strOpt(r.reversal_reason),
+  kind: (r.kind as PaymentSubmission["kind"]) ?? undefined,
+});
+
+export const mapPaymentDue = (r: Row): PaymentDue => ({
+  id: str(r.id),
+  enrollmentId: str(r.enrollment_id),
+  inquiryId: str(r.inquiry_id),
+  dueOn: day(r.due_on)!,
+  amount: Number(r.amount),
+  covered: Number(r.covered),
+  status: r.status as PaymentDue["status"],
+  note: strOpt(r.note),
+  currency: str(r.currency),
 });
 
 export const mapOnboarding = (r: Row, items: Row[]): Onboarding => ({
@@ -192,6 +206,7 @@ export const mapSettings = (r: Row): Settings => ({
   depositRule: (r.deposit_rule ?? {}) as Settings["depositRule"],
   noteEditWindowMinutes: Number(r.note_edit_window_minutes),
   unopenedAlertMinutes: Number(r.unopened_alert_minutes ?? 30),
+  paymentDueSoonDays: Number(r.payment_due_soon_days ?? 1),
 });
 
 export const mapLeadRow = (r: Row): LeadRowDTO => ({

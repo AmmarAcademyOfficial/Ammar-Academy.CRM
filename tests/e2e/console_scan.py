@@ -153,8 +153,8 @@ with sync_playwright() as p:
         for i in range(2):
             panel = open_panel(s, "/leads", "Hoda Salem", i)
             panel.get_by_role("tab", name="payments").click(); s.wait_for_timeout(400)
-            if panel.get_by_role("button", name="Submit payment").count():
-                open_and_close(s, "Submit payment", scope=panel)
+            if panel.get_by_role("button", name="Record payment").count():
+                open_and_close(s, "Record payment", scope=panel)
                 return
         raise RuntimeError("no Hoda inquiry with Submit payment")
 

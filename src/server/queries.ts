@@ -6,7 +6,7 @@ import type { Activity, FieldValue, FollowUp, LeadFilters, Role, SavedView } fro
 import type { Staff } from "./auth";
 import { asUser, type Tx } from "./db";
 import { eligibilityRows, openReviewCount, sheetHealth } from "./import-queries";
-import { mapActivity, mapAudit, mapChecklistItem, mapCourse, mapCourseType, mapEnrollment, mapField, mapFollowUp, mapLeadRow, mapNotification, mapOnboarding, mapOutcome, mapPayment, mapProfile, mapProgram, mapSettings, mapStage, mapSupportFollowUp, mapTag } from "./mappers";
+import { mapActivity, mapAudit, mapChecklistItem, mapCourse, mapCourseType, mapEnrollment, mapField, mapFollowUp, mapLeadRow, mapNotification, mapOnboarding, mapOutcome, mapPayment, mapPaymentDue, mapProfile, mapProgram, mapSettings, mapStage, mapSupportFollowUp, mapTag } from "./mappers";
 import { withDefaults } from "@/domain/filters";
 
 type Frag = postgres.Fragment;
@@ -192,7 +192,7 @@ export async function getLeadDetail(staff: Staff, id: string): Promise<LeadDetai
     const row = mapLeadRow(rows[0]);
     row.inquiry.customFields = fieldValues;
     const detail: LeadDetail = {
-      row, activities, followUps: fus.map(mapFollowUp), fieldValues, payments: [], supportFollowUps: [],
+      row, activities, followUps: fus.map(mapFollowUp), fieldValues, payments: [], dues: [], supportFollowUps: [],
       earlier: earlier.map((e) => ({
         inquiryId: String(e.inquiry_id), programCode: String(e.program_code), createdAt: new Date(e.created_at as string).toISOString(),
         ownerName: e.owner_name ? String(e.owner_name) : null, stageLabel: String(e.stage_label), visible: Boolean(e.visible),
@@ -200,12 +200,14 @@ export async function getLeadDetail(staff: Staff, id: string): Promise<LeadDetai
     };
     if (enr[0]) {
       const e = mapEnrollment(enr[0]);
-      const [pays, onb] = await Promise.all([
+      const [pays, onb, dues] = await Promise.all([
         tx<Row[]>`select * from public.payments where enrollment_id = ${e.id} order by submitted_at desc`,
         tx<Row[]>`select * from public.onboardings where enrollment_id = ${e.id}`,
+        tx<Row[]>`select * from public.payment_dues_view(${e.id})`,
       ]);
       detail.enrollment = e;
       detail.payments = pays.map(mapPayment);
+      detail.dues = dues.map(mapPaymentDue);
       detail.totals = totalsOf(e.agreedTotal, detail.payments);
       if (onb[0]) {
         const [items, sfus] = await Promise.all([

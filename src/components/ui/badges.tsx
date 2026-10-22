@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { PAYMENT_STATUS_LABEL } from "@/domain/rules";
-import type { PaymentStatus, Stage, StageKey, SubmissionStatus, SupportStatus, Tag, TagColor } from "@/domain/types";
+import type { PaymentDueStatus, PaymentStatus, Stage, StageKey, SubmissionStatus, SupportStatus, Tag, TagColor } from "@/domain/types";
 
 /** Every status shows an icon and words, never color alone. */
 export function Pill({ children, className, icon }: { children: ReactNode; className?: string; icon?: ReactNode }) {
@@ -110,6 +110,20 @@ const SUB_STYLE: Record<SubmissionStatus, [string, string]> = {
 
 export function SubmissionBadge({ status }: { status: SubmissionStatus }) {
   const [cls, label] = SUB_STYLE[status];
+  return <Pill className={cls}>{label}</Pill>;
+}
+
+const DUE_STYLE: Record<PaymentDueStatus, [string, string]> = {
+  paid: ["bg-ok-bg text-ok", "Paid"],
+  partly_paid: ["bg-info-bg text-info", "Partly paid"],
+  upcoming: ["bg-[#eeeff3] text-[#4b4e66]", "Upcoming"],
+  due_today: ["bg-warn-bg text-warn", "Due today"],
+  overdue: ["bg-bad-bg text-bad", "Overdue"],
+};
+
+/** Status of one planned payment. */
+export function DueBadge({ status }: { status: PaymentDueStatus }) {
+  const [cls, label] = DUE_STYLE[status];
   return <Pill className={cls}>{label}</Pill>;
 }
 

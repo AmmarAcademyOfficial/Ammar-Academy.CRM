@@ -188,7 +188,8 @@ export type ActivityType =
   | "reservation"
   | "enrollment"
   | "support_assignment"
-  | "support_follow_up";
+  | "support_follow_up"
+  | "payment_plan";
 
 export interface Activity {
   id: ID;
@@ -252,6 +253,26 @@ export interface PaymentSubmission {
   reversedById?: ID;
   reversedAt?: Timestamp;
   reversalReason?: string;
+  /** Deposit, installment or full payment (older records were labelled automatically). */
+  kind?: PaymentKind;
+}
+
+export type PaymentKind = "deposit" | "installment" | "full";
+
+export type PaymentDueStatus = "paid" | "partly_paid" | "upcoming" | "due_today" | "overdue";
+
+/** One expected payment in a customer's payment plan. */
+export interface PaymentDue {
+  id: ID;
+  enrollmentId: ID;
+  inquiryId: ID;
+  dueOn: string; // YYYY-MM-DD
+  amount: number;
+  /** Confirmed money applied to this due so far. */
+  covered: number;
+  status: PaymentDueStatus;
+  note?: string;
+  currency: string;
 }
 
 export type SupportStatus = "new_customer" | "onboarding" | "active";
@@ -456,4 +477,6 @@ export interface Settings {
   noteEditWindowMinutes: number;
   /** Alert the owner and managers when an assigned lead is not opened after this long. 0 = off. */
   unopenedAlertMinutes: number;
+  /** "Payment due soon" goes out this many days before a planned payment. 0 = off. */
+  paymentDueSoonDays: number;
 }

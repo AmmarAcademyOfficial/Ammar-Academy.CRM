@@ -1,9 +1,9 @@
 import "server-only";
 import type postgres from "postgres";
-import type { CustomerRow, PaymentQueueRow, PaymentsPage, SupportWork } from "@/domain/dto";
+import type { CustomerRow, PaymentDueRow, PaymentQueueRow, PaymentsPage, SupportWork } from "@/domain/dto";
 import type { Staff } from "./auth";
 import { asUser, type Tx } from "./db";
-import { mapOnboarding, mapPayment, mapSupportFollowUp } from "./mappers";
+import { mapOnboarding, mapPayment, mapPaymentDue, mapSupportFollowUp } from "./mappers";
 
 /** Reads for payments and support screens. All run as the signed-in user, so RLS decides what is visible. */
 
@@ -78,6 +78,7 @@ async function customerRows(tx: Tx, where: Frag, order: Frag, limit = 300): Prom
     select o.*, e.inquiry_id, e.course_id, e.currency, e.agreed_total, i.program_id, i.sales_owner_id, i.student_name,
            c.name as customer_name, c.phone_normalized, ${TOTALS(tx)},
            nd.label as next_label, nd.due_at as next_due, nd.kind as next_kind,
+           to_jsonb(np) as next_payment,
            coalesce((select json_agg(json_build_object('template_item_id', it.template_item_id, 'label', it.label, 'due_at', it.due_at,
                        'done_at', it.done_at, 'done_by', it.done_by) order by it.sort)
                      from public.onboarding_items it where it.onboarding_id = o.id), '[]') as items
@@ -93,6 +94,9 @@ async function customerRows(tx: Tx, where: Frag, order: Frag, limit = 300): Prom
         select f.note, f.due_at, 'follow_up' from public.support_follow_ups f where f.onboarding_id = o.id and f.status = 'open'
       ) d order by d.due_at limit 1
     ) nd on true
+    left join lateral (
+      select v.* from public.payment_dues_view(e.id) v where v.status <> 'paid' order by v.due_on limit 1
+    ) np on true
     where ${where}
     order by ${order}
     limit ${limit}`;
@@ -108,6 +112,7 @@ async function customerRows(tx: Tx, where: Frag, order: Frag, limit = 300): Prom
     totals: totals(r),
     currency: String(r.currency),
     nextDue: r.next_due ? { label: String(r.next_label), dueAt: new Date(r.next_due as string).toISOString(), kind: r.next_kind as "checklist" | "follow_up" } : undefined,
+    nextPayment: r.next_payment ? mapPaymentDue(r.next_payment as Row) : undefined,
   }));
 }
 
@@ -172,5 +177,33 @@ export async function supportWork(staff: Staff): Promise<SupportWork> {
         dueAt: new Date(o.due_at as string).toISOString(), onboardingId: String(o.onboarding_id),
       })),
     };
+  });
+}
+
+// ── Payments due (support and managers) ──────────────────────────────────
+
+/**
+ * Planned payments not yet paid that are overdue or due within `days`: for support, their own
+ * customers; for managers, everyone (optionally one support agent's customers).
+ */
+export async function paymentDues(staff: Staff, opts: { days: number; owner: "mine" | "any" | string }): Promise<PaymentDueRow[]> {
+  return asUser(staff.id, async (tx) => {
+    const owner =
+      staff.role === "support" || opts.owner === "mine" ? tx`o.support_owner_id = ${staff.id}`
+      : opts.owner === "any" ? tx`true`
+      : tx`o.support_owner_id = ${opts.owner}`;
+    const rows = await tx<Row[]>`
+      select v.*, c.name as customer_name, o.support_owner_id
+      from public.payment_dues_view(null) v
+      join public.inquiries i on i.id = v.inquiry_id
+      join public.contacts c on c.id = i.contact_id
+      left join public.enrollments e on e.id = v.enrollment_id
+      left join public.onboardings o on o.enrollment_id = e.id
+      where v.status <> 'paid'
+        and v.due_on <= (now() at time zone 'Africa/Cairo')::date + ${opts.days}::int
+        and ${owner}
+      order by v.due_on, c.name
+      limit 300`;
+    return rows.map((r) => ({ ...mapPaymentDue(r), customerName: String(r.customer_name), supportOwnerId: r.support_owner_id ? String(r.support_owner_id) : null }));
   });
 }

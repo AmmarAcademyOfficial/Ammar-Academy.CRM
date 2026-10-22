@@ -1,8 +1,14 @@
 import { formatMoney } from "@/domain/rules";
-import type { Course, CourseDelivery, PaymentMethod } from "@/domain/types";
+import type { Course, CourseDelivery, PaymentKind, PaymentMethod } from "@/domain/types";
 import type { Reference } from "@/domain/dto";
 
 export const DELIVERY_LABEL: Record<CourseDelivery, string> = { online: "Online", in_person: "In person", hybrid: "Hybrid" };
+
+export const KIND_LABEL: Record<PaymentKind, string> = {
+  deposit: "Deposit",
+  installment: "Installment",
+  full: "Full payment",
+};
 
 export const METHOD_LABEL: Record<PaymentMethod, string> = {
   bank_transfer: "Bank transfer",

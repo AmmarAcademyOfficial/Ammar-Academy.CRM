@@ -39,6 +39,13 @@ export function NotificationsSettings() {
             unit="minutes"
             onSave={(n) => save({ unopenedAlertMinutes: n })}
           />
+          <NumberSetting
+            label="Remind before a planned payment"
+            hint="Payment due soon goes out this many days before the date (from 9:00). Overdue alerts follow the day after. 0 turns the reminder off."
+            value={s.paymentDueSoonDays}
+            unit="days"
+            onSave={(n) => save({ paymentDueSoonDays: n })}
+          />
         </div>
       </Card>
 

@@ -236,6 +236,7 @@ export async function updateSettings(patch: Partial<Settings>): Promise<Result<v
       first_contact_target_minutes: patch.newLeadFirstContactTargetMinutes,
       note_edit_window_minutes: patch.noteEditWindowMinutes,
       unopened_alert_minutes: patch.unopenedAlertMinutes,
+      payment_due_soon_days: patch.paymentDueSoonDays,
       handover_trigger: patch.handoverTrigger,
       deposit_rule: patch.depositRule,
     };

@@ -191,6 +191,10 @@ export async function seedDev(admin) {
   const jana = await inquiryOf("Jana Ezzat");
   const eJana = await enroll(ids.youssef, jana, courses.satFull, 15000);
   await decide(await pay(ids.youssef, eJana, 4500, "bank_transfer", "CIB-TRX-889201", fakeReceipt()), "confirmed");
+  // Her payment plan (set after the deposit): one installment already overdue, one next month.
+  await q(`insert into public.payment_dues (enrollment_id, due_on, amount, note, created_by, created_at, due_soon_notified_at, overdue_notified_at)
+           values ($1, (now() at time zone 'Africa/Cairo')::date - 3, 5000, 'Second installment', $2, now(), now(), now()),
+                  ($1, (now() at time zone 'Africa/Cairo')::date + 27, 5500, 'Final installment', $2, now(), null, null)`, [eJana, manager]);
 
   // Sara Nasser: early-bird price, paid in full → handed over and being onboarded by Laila.
   const sara = await inquiryOf("Sara Nasser");

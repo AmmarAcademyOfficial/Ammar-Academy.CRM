@@ -114,6 +114,7 @@ const paymentSchema = z.object({
   reference: z.string().max(100).optional(),
   note: z.string().max(1000).optional(),
   receiptToken: z.string().max(4000).optional(),
+  kind: z.enum(["deposit", "installment", "full"]).optional(),
 });
 
 export async function submitPayment(input: z.input<typeof paymentSchema>): Promise<Result<string>> {
@@ -124,9 +125,36 @@ export async function submitPayment(input: z.input<typeof paymentSchema>): Promi
     if (v.receiptToken && !receipt) throw new ValidationError("The uploaded receipt expired. Please attach it again.");
     const [{ id }] = await asUser(staff.id, (tx) => tx<{ id: string }[]>`select public.submit_payment(${tx.json({
       enrollment_id: v.enrollmentId, amount: v.amount, paid_on: v.paidOn, method: v.method,
-      reference: v.reference ?? null, note: v.note ?? null, receipt: receipt as never,
+      reference: v.reference ?? null, note: v.note ?? null, receipt: receipt as never, kind: v.kind ?? null,
     })}) as id`);
     return id;
+  });
+}
+
+const dueSchema = z.object({
+  id: uuid.optional(),
+  enrollmentId: uuid,
+  dueOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Enter the due date."),
+  amount: money.positive("Enter the amount due."),
+  note: z.string().max(300).optional(),
+});
+
+/** Add or change one expected payment in a customer's payment plan (managers and the support owner). */
+export async function savePaymentDue(input: z.input<typeof dueSchema>): Promise<Result<string>> {
+  return attempt(async () => {
+    const parsed = dueSchema.safeParse(input);
+    if (!parsed.success) throw new ValidationError(parsed.error.issues[0].message, parsed.error.issues.map((i) => i.message));
+    const v = parsed.data;
+    const [{ id }] = await asMe((tx) => tx<{ id: string }[]>`select public.save_payment_due(${tx.json({
+      id: v.id ?? null, enrollment_id: v.enrollmentId, due_on: v.dueOn, amount: v.amount, note: v.note ?? null,
+    })}) as id`);
+    return id;
+  });
+}
+
+export async function deletePaymentDue(id: string): Promise<Result<void>> {
+  return attempt(async () => {
+    await asMe((tx) => tx`select public.delete_payment_due(${uuid.parse(id)})`);
   });
 }
 

@@ -6,6 +6,7 @@ import type { IneligibleReason } from "./rules";
 import type {
   Activity,
   AppNotification,
+  PaymentDue,
   NotificationRule,
   AuditEntry,
   Course,
@@ -89,6 +90,8 @@ export interface LeadDetail {
   enrollment?: Enrollment;
   payments: PaymentSubmission[];
   totals?: PaymentTotalsDTO;
+  /** The customer's payment plan, earliest first. */
+  dues: PaymentDue[];
   onboarding?: Onboarding;
   supportFollowUps: SupportFollowUp[];
   activities: Activity[];
@@ -165,6 +168,14 @@ export interface CustomerRow {
   totals: PaymentTotalsDTO;
   currency: string;
   nextDue?: { label: string; dueAt: string; kind: "checklist" | "follow_up" };
+  /** The earliest planned payment not yet paid. */
+  nextPayment?: PaymentDue;
+}
+
+/** A planned payment in the support / manager "Payments due" list. */
+export interface PaymentDueRow extends PaymentDue {
+  customerName: string;
+  supportOwnerId: ID | null;
 }
 
 export interface SupportWork {

@@ -1,11 +1,10 @@
 import { getStaff } from "@/server/auth";
 import { MAX_RECEIPT_BYTES, putReceipt, receiptToken, sniffReceipt } from "@/server/storage";
 
-/** Upload a payment receipt (sales and managers). Returns a signed token used when submitting the payment. */
+/** Upload a payment receipt (sales, support and managers). Returns a signed token used when submitting the payment. */
 export async function POST(req: Request) {
   const staff = await getStaff();
   if (!staff) return Response.json({ error: "Sign in again." }, { status: 401 });
-  if (staff.role === "support") return Response.json({ error: "Only sales and managers submit payments." }, { status: 403 });
   let form: FormData;
   try {
     form = await req.formData();

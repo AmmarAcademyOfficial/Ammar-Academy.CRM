@@ -324,7 +324,7 @@ function LeadPanel({ inquiryId, onClose, onDirtyChange }: { inquiryId: ID; onClo
           </div>
         )}
         {shown === "details" && <DetailsTab row={row} values={data.fieldValues} onDirtyChange={setDetailsDirty} onReload={reload} />}
-        {shown === "payments" && <PaymentsTab detail={data} row={row} canWork={ownsSales} />}
+        {shown === "payments" && <PaymentsTab detail={data} row={row} canWork={ownsSales} canPay={ownsSales || supportOwner} canPlan={me.role === "manager" || supportOwner} />}
         {shown === "support" && ob && <SupportTab detail={data} />}
       </div>
 

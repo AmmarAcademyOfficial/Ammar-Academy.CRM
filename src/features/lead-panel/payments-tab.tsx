@@ -1,8 +1,8 @@
 "use client";
 
-import { Check, GraduationCap, Info, Loader2, Paperclip, Pencil, Plus, Undo2, Upload, X } from "lucide-react";
+import { CalendarRange, Check, GraduationCap, Info, Loader2, Paperclip, Pencil, Plus, Trash2, Undo2, Upload, X } from "lucide-react";
 import { useRef, useState } from "react";
-import { PaymentBadge, SubmissionBadge } from "@/components/ui/badges";
+import { DueBadge, PaymentBadge, SubmissionBadge } from "@/components/ui/badges";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select, Textarea } from "@/components/ui/form";
 import { EmptyState } from "@/components/ui/misc";
@@ -10,13 +10,13 @@ import { Dialog } from "@/components/ui/overlay";
 import { useToast } from "@/components/ui/toast";
 import type { LeadDetail } from "@/domain/dto";
 import { cairoParts, formatCairo, formatMoney, handoverCheck } from "@/domain/rules";
-import type { PaymentMethod, PaymentStatus, PaymentSubmission } from "@/domain/types";
+import type { PaymentDue, PaymentKind, PaymentMethod, PaymentStatus, PaymentSubmission } from "@/domain/types";
 import { CourseTypeChip } from "@/features/settings/courses-settings";
-import { METHOD_LABEL, courseFacts, courseOf, courseTypeOf, priceText } from "@/lib/courses";
+import { KIND_LABEL, METHOD_LABEL, courseFacts, courseOf, courseTypeOf, priceText } from "@/lib/courses";
 import { profileName, type LeadRow } from "@/lib/lead-row";
 import { useRunAction } from "@/lib/run-action";
 import { useWorkspace } from "@/lib/workspace";
-import { decidePayment, reversePayment, saveEnrollment, submitPayment } from "@/server/payment-actions";
+import { decidePayment, deletePaymentDue, reversePayment, saveEnrollment, savePaymentDue, submitPayment } from "@/server/payment-actions";
 
 const HANDOVER_TEXT = {
   below_threshold: "Not handed over yet: confirmed payments are below the qualifying deposit.",
@@ -24,10 +24,15 @@ const HANDOVER_TEXT = {
   needs_full_payment: "Not handed over yet: handover waits for full payment.",
 } as const;
 
-export function PaymentsTab({ detail, row, canWork }: { detail: LeadDetail; row: LeadRow; canWork: boolean }) {
+/**
+ * canWork: may change the enrollment (sales owner, managers). canPay: may record payments (also the
+ * customer's support owner). canPlan: may change the payment plan (managers, support owner).
+ */
+export function PaymentsTab({ detail, row, canWork, canPay, canPlan }: { detail: LeadDetail; row: LeadRow; canWork: boolean; canPay: boolean; canPlan: boolean }) {
   const { ref, me } = useWorkspace();
   const [enrolling, setEnrolling] = useState(false);
   const [paying, setPaying] = useState(false);
+  const [dueEdit, setDueEdit] = useState<PaymentDue | "new" | null>(null);
   const e = detail.enrollment;
   const t = detail.totals;
 
@@ -71,7 +76,7 @@ export function PaymentsTab({ detail, row, canWork }: { detail: LeadDetail; row:
         <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
           <div><p className="text-xs text-muted">Agreed total</p><p className="font-semibold tabular-nums">{formatMoney(t.agreed, e.currency)}</p></div>
           <div><p className="text-xs text-muted">Confirmed paid</p><p className="font-semibold tabular-nums text-ok">{formatMoney(t.paid, e.currency)}</p></div>
-          <div><p className="text-xs text-muted">Balance</p><p className="font-semibold tabular-nums">{formatMoney(t.balance, e.currency)}</p></div>
+          <div><p className="text-xs text-muted">Balance left</p><p className="font-semibold tabular-nums" data-testid="balance-left">{formatMoney(t.balance, e.currency)}</p></div>
         </div>
         <div className="mt-3 h-2 overflow-hidden rounded-full bg-navy-50" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Confirmed share of agreed total">
           <div className="h-full rounded-full bg-ok" style={{ width: `${pct}%` }} />
@@ -85,10 +90,12 @@ export function PaymentsTab({ detail, row, canWork }: { detail: LeadDetail; row:
         {e.originalSalesOwnerId && <p className="mt-1 text-xs text-muted">Sold by {profileName(ref, e.originalSalesOwnerId)}</p>}
       </section>
 
+      <PlanSection dues={detail.dues} currency={e.currency} canPlan={canPlan && t.balance > 0} onAdd={() => setDueEdit("new")} onEdit={setDueEdit} />
+
       <section>
         <div className="mb-2 flex items-center justify-between">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Payments</h3>
-          {canWork && remaining > 0 && <Button size="sm" variant="primary" icon={<Plus size={14} />} onClick={() => setPaying(true)}>Submit payment</Button>}
+          {canPay && remaining > 0 && <Button size="sm" variant="primary" icon={<Plus size={14} />} onClick={() => setPaying(true)}>Record payment</Button>}
         </div>
         {detail.payments.length === 0 ? (
           <p className="text-sm text-muted">No payments submitted yet.</p>
@@ -98,7 +105,11 @@ export function PaymentsTab({ detail, row, canWork }: { detail: LeadDetail; row:
       </section>
 
       {enrolling && <EnrollmentDialog detail={detail} row={row} onClose={() => setEnrolling(false)} />}
-      {paying && <PaymentDialog enrollmentId={e.id} currency={e.currency} remaining={remaining} onClose={() => setPaying(false)} />}
+      {paying && (
+        <PaymentDialog enrollmentId={e.id} currency={e.currency} remaining={remaining} canPlan={canPlan}
+          firstPayment={!detail.payments.some((p) => p.status === "pending" || p.status === "confirmed")} onClose={() => setPaying(false)} />
+      )}
+      {dueEdit && <DueDialog enrollmentId={e.id} currency={e.currency} due={dueEdit === "new" ? null : dueEdit} onClose={() => setDueEdit(null)} />}
     </div>
   );
 }
@@ -139,6 +150,7 @@ export function SubmissionItem({ p, currency, customer }: { p: PaymentSubmission
     <article className="rounded-lg border border-line p-3" aria-label={`Payment ${formatMoney(p.amount, currency)}${customer ? ` for ${customer}` : ""}`}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <span className="text-[15px] font-semibold tabular-nums">{formatMoney(p.amount, currency)}</span>
+        {p.kind && <span className="text-xs font-medium text-ink/80" data-kind={p.kind}>{KIND_LABEL[p.kind]}</span>}
         <SubmissionBadge status={p.status} />
         <span className="text-xs text-muted">{METHOD_LABEL[p.method]} · paid {formatCairo(p.paidOn, "date")}{p.reference ? <> · ref <span dir="ltr">{p.reference}</span></> : null}</span>
       </div>
@@ -240,14 +252,79 @@ function EnrollmentDialog({ detail, row, onClose }: { detail: LeadDetail; row: L
   );
 }
 
+// ── Payment plan ─────────────────────────────────────────────────────────
+
+function PlanSection({ dues, currency, canPlan, onAdd, onEdit }: { dues: PaymentDue[]; currency: string; canPlan: boolean; onAdd: () => void; onEdit: (d: PaymentDue) => void }) {
+  const runAction = useRunAction();
+  if (dues.length === 0 && !canPlan) return null;
+  return (
+    <section aria-label="Payment plan">
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Payment plan</h3>
+        {canPlan && <Button size="sm" icon={<CalendarRange size={14} />} onClick={onAdd}>Add expected payment</Button>}
+      </div>
+      {dues.length === 0 ? (
+        <p className="text-sm text-muted">No payments planned. Add the next payment date so you are reminded before it is due.</p>
+      ) : (
+        <ul className="divide-y divide-line rounded-lg border border-line">
+          {dues.map((d) => (
+            <li key={d.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5 text-sm" data-due={d.status}>
+              <span className="w-28 shrink-0 font-medium">{formatCairo(d.dueOn, "date")}</span>
+              <span className="font-semibold tabular-nums">{formatMoney(d.amount, currency)}</span>
+              <DueBadge status={d.status} />
+              {d.covered > 0 && d.status !== "paid" && <span className="text-xs text-muted">{formatMoney(d.covered, currency)} paid · {formatMoney(d.amount - d.covered, currency)} left</span>}
+              {d.note && <span dir="auto" className="text-xs text-muted">{d.note}</span>}
+              {canPlan && d.status !== "paid" && (
+                <span className="ml-auto flex gap-1">
+                  <button className="rounded-md p-1.5 text-muted hover:bg-navy-50 hover:text-ink" aria-label={`Change payment due ${formatCairo(d.dueOn, "date")}`} onClick={() => onEdit(d)}><Pencil size={14} /></button>
+                  <button className="rounded-md p-1.5 text-muted hover:bg-bad-bg hover:text-bad" aria-label={`Remove payment due ${formatCairo(d.dueOn, "date")}`}
+                    onClick={() => runAction(deletePaymentDue(d.id), "Removed from the payment plan")}><Trash2 size={14} /></button>
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="mt-1.5 text-xs text-muted">Confirmed payments recorded after the plan was set count toward it, earliest due first. You are reminded before each date and told if it becomes overdue.</p>
+    </section>
+  );
+}
+
+function DueDialog({ enrollmentId, currency, due, onClose }: { enrollmentId: string; currency: string; due: PaymentDue | null; onClose: () => void }) {
+  const { now } = useWorkspace();
+  const runAction = useRunAction();
+  const today = cairoParts(now).date;
+  const [f, setF] = useState({ dueOn: due?.dueOn ?? "", amount: due ? String(due.amount) : "", note: due?.note ?? "" });
+  const [busy, setBusy] = useState(false);
+  const save = async () => {
+    setBusy(true);
+    const r = await runAction(savePaymentDue({ id: due?.id, enrollmentId, dueOn: f.dueOn, amount: Number(f.amount), note: f.note || undefined }), due ? "Payment plan updated" : "Added to the payment plan");
+    setBusy(false);
+    if (r.ok) onClose();
+  };
+  return (
+    <Dialog open onClose={onClose} title={due ? "Change expected payment" : "Add expected payment"} description="When the customer has promised to pay, and how much."
+      footer={<><Button onClick={onClose}>Cancel</Button><Button variant="primary" disabled={busy || !f.dueOn || !(Number(f.amount) > 0)} onClick={save}>{busy ? "Saving…" : "Save"}</Button></>}>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Due date" required>{(p) => <Input type="date" min={today} value={f.dueOn} onChange={(e) => setF({ ...f, dueOn: e.target.value })} {...p} />}</Field>
+        <Field label={`Amount (${currency})`} required>{(p) => <Input inputMode="decimal" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} {...p} />}</Field>
+        <Field label="Note (optional)" className="sm:col-span-2">{(p) => <Input value={f.note} maxLength={300} onChange={(e) => setF({ ...f, note: e.target.value })} placeholder="e.g. Second installment, after salary" {...p} />}</Field>
+      </div>
+    </Dialog>
+  );
+}
+
 // ── Submit a payment ─────────────────────────────────────────────────────
 
-function PaymentDialog({ enrollmentId, currency, remaining, onClose }: { enrollmentId: string; currency: string; remaining: number; onClose: () => void }) {
+function PaymentDialog({ enrollmentId, currency, remaining, canPlan, firstPayment, onClose }: {
+  enrollmentId: string; currency: string; remaining: number; canPlan: boolean; firstPayment: boolean; onClose: () => void;
+}) {
   const { now } = useWorkspace();
   const runAction = useRunAction();
   const toast = useToast();
   const today = cairoParts(now).date;
-  const [f, setF] = useState({ amount: "", paidOn: today, method: "instapay" as PaymentMethod, reference: "", note: "" });
+  const [f, setF] = useState({ amount: "", paidOn: today, method: "instapay" as PaymentMethod, reference: "", note: "", kind: (firstPayment ? "deposit" : "installment") as PaymentKind });
+  const [next, setNext] = useState({ dueOn: "", amount: "" });
   const [receipt, setReceipt] = useState<{ token: string; name: string } | null>(null);
   const [uploading, setUploading] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -255,6 +332,9 @@ function PaymentDialog({ enrollmentId, currency, remaining, onClose }: { enrollm
   const cash = f.method === "cash";
   const amount = Number(f.amount);
   const tooMuch = amount > remaining + 0.005;
+  const leftAfter = Math.max(remaining - (amount || 0), 0);
+  const askNext = canPlan && f.kind !== "full" && amount > 0 && leftAfter > 0.005;
+  const pickKind = (kind: PaymentKind) => setF({ ...f, kind, amount: kind === "full" ? String(remaining) : f.amount });
 
   const upload = async (file: File) => {
     setUploading(true);
@@ -276,19 +356,35 @@ function PaymentDialog({ enrollmentId, currency, remaining, onClose }: { enrollm
   const submit = async () => {
     setBusy(true);
     const r = await runAction(submitPayment({
-      enrollmentId, amount, paidOn: f.paidOn, method: f.method, reference: f.reference || undefined, note: f.note || undefined, receiptToken: receipt?.token,
+      enrollmentId, amount, paidOn: f.paidOn, method: f.method, reference: f.reference || undefined, note: f.note || undefined, receiptToken: receipt?.token, kind: f.kind,
     }), "Payment submitted. A manager will confirm it.");
+    if (r.ok && askNext && next.dueOn && Number(next.amount) > 0) {
+      await runAction(savePaymentDue({ enrollmentId, dueOn: next.dueOn, amount: Number(next.amount) }), "Next payment added to the plan");
+    }
     setBusy(false);
     if (r.ok) onClose();
   };
 
-  const ready = amount > 0 && !tooMuch && f.paidOn && (cash || (f.reference.trim() && receipt));
+  const fullWrong = f.kind === "full" && Math.abs(amount - remaining) > 0.005;
+  const nextHalf = askNext && (!!next.dueOn !== Number(next.amount) > 0);
+  const ready = amount > 0 && !tooMuch && !fullWrong && !nextHalf && f.paidOn && (cash || (f.reference.trim() && receipt));
   return (
-    <Dialog open onClose={onClose} title="Submit payment" description="It counts only after a manager confirms it."
+    <Dialog open onClose={onClose} title="Record payment" description="It counts only after a manager confirms it."
       footer={<><Button onClick={onClose}>Cancel</Button><Button variant="primary" disabled={busy || uploading || !ready} onClick={submit}>{busy ? "Submitting…" : "Submit for confirmation"}</Button></>}>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label={`Amount (${currency})`} required error={tooMuch ? `More than the remaining ${formatMoney(remaining, currency)}` : undefined} hint={!tooMuch ? `Remaining: ${formatMoney(remaining, currency)}` : undefined}>
-          {(p) => <Input inputMode="decimal" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} {...p} />}
+      <div className="grid gap-4 sm:grid-cols-2 [&>*]:min-w-0">
+        <Field label="Payment type" required className="sm:col-span-2">
+          {(p) => (
+            <Select value={f.kind} onChange={(e) => pickKind(e.target.value as PaymentKind)} {...p}>
+              <option value="deposit">Deposit (first part)</option>
+              <option value="installment">Installment (partial payment)</option>
+              <option value="full">Full payment (the whole balance)</option>
+            </Select>
+          )}
+        </Field>
+        <Field label={`Amount (${currency})`} required
+          error={tooMuch ? `More than the remaining ${formatMoney(remaining, currency)}` : fullWrong ? `A full payment is the whole ${formatMoney(remaining, currency)}` : undefined}
+          hint={!tooMuch && !fullWrong ? `Remaining: ${formatMoney(remaining, currency)}` : undefined}>
+          {(p) => <Input inputMode="decimal" value={f.amount} readOnly={f.kind === "full"} onChange={(e) => setF({ ...f, amount: e.target.value })} {...p} />}
         </Field>
         <Field label="Paid on" required>{(p) => <Input type="date" max={today} value={f.paidOn} onChange={(e) => setF({ ...f, paidOn: e.target.value })} {...p} />}</Field>
         <Field label="Method" required>
@@ -304,11 +400,23 @@ function PaymentDialog({ enrollmentId, currency, remaining, onClose }: { enrollm
           <label htmlFor="receipt-file" className="flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-line px-3 py-3 text-sm hover:bg-navy-50">
             {uploading ? <Loader2 size={16} className="animate-spin" aria-hidden /> : receipt ? <Paperclip size={16} className="text-ok" aria-hidden /> : <Upload size={16} aria-hidden />}
             <span className="min-w-0 flex-1 truncate">{uploading ? "Uploading…" : receipt ? receipt.name : "Choose a photo or PDF of the receipt"}</span>
-            <span className="text-xs text-muted">JPG, PNG, WebP or PDF · up to 10 MB</span>
+            <span className="hidden text-xs text-muted sm:inline">JPG, PNG, WebP or PDF · up to 10 MB</span>
           </label>
-          <p className="mt-1 text-xs text-muted">Stored privately. Only managers and the people working on this customer can open it.</p>
+          <p className="mt-1 text-xs text-muted"><span className="sm:hidden">JPG, PNG, WebP or PDF, up to 10 MB. </span>Stored privately. Only managers and the people working on this customer can open it.</p>
         </div>
         <Field label="Note (optional)" className="sm:col-span-2">{(p) => <Textarea value={f.note} maxLength={1000} onChange={(e) => setF({ ...f, note: e.target.value })} {...p} />}</Field>
+        {askNext && (
+          <fieldset className="rounded-lg border border-line p-3 sm:col-span-2">
+            <legend className="px-1 text-[13px] font-medium">Next payment (optional)</legend>
+            <p className="mb-3 text-xs text-muted">{formatMoney(leftAfter, currency)} will be left. Add when the customer will pay next, to be reminded.</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Next payment date">{(p) => <Input type="date" min={today} value={next.dueOn} onChange={(e) => setNext({ ...next, dueOn: e.target.value })} {...p} />}</Field>
+              <Field label={`Next payment amount (${currency})`} error={nextHalf ? "Fill in both the date and the amount, or neither" : undefined}>
+                {(p) => <Input inputMode="decimal" value={next.amount} placeholder={String(leftAfter)} onChange={(e) => setNext({ ...next, amount: e.target.value })} {...p} />}
+              </Field>
+            </div>
+          </fieldset>
+        )}
       </div>
     </Dialog>
   );

@@ -1,26 +1,6 @@
 "use client";
 
-import {
-  ArrowRightLeft,
-  BadgeCheck,
-  BookmarkCheck,
-  CalendarCheck,
-  CalendarPlus,
-  CreditCard,
-  Download,
-  Flag,
-  GraduationCap,
-  Headset,
-  ListChecks,
-  MessageSquare,
-  MousePointerClick,
-  PencilLine,
-  Phone,
-  PhoneOff,
-  RefreshCw,
-  Tag,
-  type LucideIcon,
-} from "lucide-react";
+import { ArrowRightLeft, BadgeCheck, BookmarkCheck, CalendarCheck, CalendarPlus, CalendarRange, CreditCard, Download, Flag, GraduationCap, Headset, ListChecks, type LucideIcon, MessageSquare, MousePointerClick, PencilLine, Phone, PhoneOff, RefreshCw, Tag } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/form";
@@ -53,6 +33,7 @@ const ICON: Record<ActivityType, LucideIcon> = {
   outreach_shortcut: MousePointerClick,
   field_change: PencilLine,
   reservation: BookmarkCheck,
+  payment_plan: CalendarRange,
 };
 
 export function Timeline({ activities, readOnly }: { activities: Activity[]; readOnly?: boolean }) {

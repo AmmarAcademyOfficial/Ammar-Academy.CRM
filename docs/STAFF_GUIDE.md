@@ -20,7 +20,7 @@ A one-page guide for each role. Share the section that fits each person.
 
 **When the customer pays**
 1. **Payments** tab → **Start enrollment**. The price starts from the course price; a different price needs a reason (for example "Sibling discount").
-2. **Submit payment**: amount, date, method, reference and a photo or PDF of the receipt (not needed for cash).
+2. **Record payment**: type (*Deposit*, *Installment* or *Full payment* of the whole balance), amount, date, method, reference and a photo or PDF of the receipt (not needed for cash).
 3. A manager confirms it. You are notified either way. Once the payment rule is met, the customer is **Enrolled** and handed to support automatically.
 
 **Notifications** (everyone)
@@ -38,13 +38,20 @@ You see only your own leads. You cannot confirm payments or reassign leads.
 3. Set the status to **Active** once every checklist step is done (the CRM will not allow it earlier).
 4. A customer marked **Flagged** had a payment reversed; a manager will review it.
 
+**Payments from your customers**
+- Each customer shows the **balance left**. Open the customer → **Payments** → **Record payment**: choose the type (*Deposit*, *Installment*, *Full payment*), amount, date, method, reference, and attach the receipt screenshot or PDF. A manager confirms it before it counts, as for sales.
+- After a partial payment, fill in **Next payment** (date and amount) so you are reminded. You can also use **Add expected payment** in the **Payment plan**, and change or remove planned payments.
+- Each planned payment shows *Upcoming*, *Due today*, *Partly paid*, *Paid* or *Overdue*. Confirmed payments recorded after the plan was set count toward it, earliest date first.
+- **My Work → Payments due** lists overdue payments and those due in the next 7 days. You get a notification the day before a payment is due, and the morning after if it is not paid (then weekly). Managers are told about overdue payments too.
+
 You see handed-over customers only (the queue and your own), never sales prospects.
 
 ## Managers
 
 **Daily**
 - **Overview**: new leads, the waiting queue (**Run assignment now**), who is on shift, Google Sheets health, payments to confirm.
-- **Payments**: open each receipt, then **Confirm** or **Reject** (with a reason). **Reverse** a confirmed payment that bounced.
+- **Payments**: open each receipt, then **Confirm** or **Reject** (with a reason). **Reverse** a confirmed payment that bounced. Each payment shows its type and who recorded it (sales or support).
+- **Support → Payments due**: overdue and upcoming planned payments for every support agent's customers (filter by agent with the owner filter).
 - **Needs Review**: sheet rows the CRM could not import safely; fix and import, or dismiss with a reason.
 
 **Weekly**
