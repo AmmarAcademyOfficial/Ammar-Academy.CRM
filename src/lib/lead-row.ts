@@ -38,3 +38,13 @@ export function profileName(ref: Reference, id: string | null | undefined): stri
   if (id === "system") return "System";
   return ref.profiles.find((p) => p.id === id)?.fullName ?? "Former staff";
 }
+
+/** Assigned to someone who has not opened it yet: shown highlighted in yellow with a "New" label. */
+export function isUnopened(inquiry: { salesOwnerId: string | null; ownerOpenedAt?: string }): boolean {
+  return !!inquiry.salesOwnerId && !inquiry.ownerOpenedAt;
+}
+
+/** A handed-over customer their support person has not opened yet (or nobody has taken yet). */
+export function isUnopenedCustomer(onboarding: { supportOpenedAt?: string }): boolean {
+  return !onboarding.supportOpenedAt;
+}

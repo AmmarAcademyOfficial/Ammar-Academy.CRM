@@ -74,18 +74,18 @@ async function parseAll(input: AnalyzeInput) {
 export async function analyzeTab(input: AnalyzeInput): Promise<TabAnalysis> {
   const { info, tab, headerRow, headers, samples, mapping, identity, ctx, parsed } = await parseAll(input);
 
-  // Which phones already belong to customers, and which have an open inquiry for the same program.
+  // Which phones already belong to customers (main or second number), and which have an open inquiry for the same program.
   const ok = parsed.filter((p) => p.row.kind === "ok").map((p) => (p.row as Extract<ParsedRow, { kind: "ok" }>).payload);
   const phones = [...new Set(ok.map((p) => p.phone_normalized))];
   const known = phones.length
     ? await asSystem((tx) => tx<{ phone: string; open_programs: string[] }[]>`
-        select c.phone_normalized as phone,
+        select x.phone,
           coalesce(array_agg(i.program_id::text) filter (where i.id is not null and not s.is_closed), '{}') as open_programs
-        from public.contacts c
+        from unnest(${phones}::text[]) as x(phone)
+        join public.contacts c on c.phone_normalized = x.phone or c.phone_secondary_normalized = x.phone
         left join public.inquiries i on i.contact_id = c.id
         left join public.stages s on s.id = i.stage_id
-        where c.phone_normalized = any(${phones})
-        group by c.phone_normalized`)
+        group by x.phone`)
     : [];
   const knownMap = new Map(known.map((k) => [k.phone, k.open_programs]));
   const programCode = (id: string) => ctx.programs.find((p) => p.id === id)?.code ?? "";

@@ -138,3 +138,13 @@ export function SimulatedTag({ children = "Simulated" }: { children?: ReactNode 
     </Pill>
   );
 }
+
+/** "New": assigned but not opened yet by its owner. Shown with the yellow row highlight. */
+export function NewBadge() {
+  return <span data-badge="new" className="inline-flex h-5 shrink-0 items-center whitespace-nowrap rounded-full bg-new-badge px-1.5 text-[11px] font-semibold text-new-ink">New</span>;
+}
+
+/** The customer had an earlier inquiry. */
+export function ReturningBadge() {
+  return <span data-badge="returning" className="inline-flex h-5 shrink-0 items-center whitespace-nowrap rounded-full bg-info-bg px-1.5 text-[11px] font-semibold text-info">Returning customer</span>;
+}

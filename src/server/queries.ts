@@ -57,7 +57,8 @@ function leadSelect(tx: Tx, where: Frag, orderBy: Frag, limit: number, offset: n
       i.id, i.contact_id, i.program_id, i.student_name, i.stage_id, i.last_outcome_id, i.sales_owner_id,
       i.primary_tag_id, i.source, i.source_connection_id, i.created_at, i.assigned_at,
       i.first_contact_attempt_at, i.last_contact_at, i.no_follow_up_reason, i.lost_reason,
-      i.reserved, i.reserved_note, i.course_id, i.version,
+      i.reserved, i.reserved_note, i.course_id, i.version, i.owner_opened_at, i.assignment_method,
+      private.has_earlier_inquiry(i.contact_id, i.id, i.created_at) as returning_customer,
       c.name as c_name, c.phone as c_phone, c.phone_normalized as c_phone_normalized,
       c.phone_secondary_normalized as c_phone_secondary, c.contact_type as c_contact_type,
       c.do_not_contact as c_dnc, c.do_not_contact_reason as c_dnc_reason, c.created_at as c_created_at,
@@ -121,6 +122,7 @@ export function filterSql(tx: Tx, f: LeadFilters): Frag {
     parts.push(tx`exists (select 1 from public.courses cr where cr.id = i.course_id and cr.course_type_id = any (${f.courseTypeIds}::uuid[]))`);
   }
   if (f.uncontactedOnly) parts.push(tx`i.first_contact_attempt_at is null`);
+  if (f.unopenedOnly) parts.push(tx`i.sales_owner_id is not null and i.owner_opened_at is null`);
   switch (f.followUp) {
     case "overdue":
       parts.push(tx`nf.due_at < now()`);
@@ -174,19 +176,26 @@ export async function getLeadDetail(staff: Staff, id: string): Promise<LeadDetai
   return asUser(staff.id, async (tx) => {
     const rows = await leadSelect(tx, tx`i.id = ${id}`, tx`i.id`, 1, 0);
     if (!rows.length) return null; // not visible to this user
-    const [acts, revs, fus, vals, enr] = await Promise.all([
+    const [acts, revs, fus, vals, enr, earlier] = await Promise.all([
       tx<Row[]>`select * from public.activities where inquiry_id = ${id} order by created_at desc, id desc`,
       tx<Row[]>`select r.* from public.note_revisions r join public.activities a on a.id = r.activity_id where a.inquiry_id = ${id} order by r.edited_at`,
       tx<Row[]>`select * from public.follow_ups where inquiry_id = ${id} order by status = 'open' desc, due_at`,
       tx<Row[]>`select field_id, value from public.field_values where inquiry_id = ${id}`,
       tx<Row[]>`select * from public.enrollments where inquiry_id = ${id}`,
+      tx<Row[]>`select * from public.earlier_inquiries(${id})`,
     ]);
     const activities: Activity[] = acts.map((a) => mapActivity(a, revs.filter((r) => r.activity_id === a.id)));
     const fieldValues: Record<string, FieldValue> = {};
     vals.forEach((v) => (fieldValues[String(v.field_id)] = v.value as FieldValue));
     const row = mapLeadRow(rows[0]);
     row.inquiry.customFields = fieldValues;
-    const detail: LeadDetail = { row, activities, followUps: fus.map(mapFollowUp), fieldValues, payments: [], supportFollowUps: [] };
+    const detail: LeadDetail = {
+      row, activities, followUps: fus.map(mapFollowUp), fieldValues, payments: [], supportFollowUps: [],
+      earlier: earlier.map((e) => ({
+        inquiryId: String(e.inquiry_id), programCode: String(e.program_code), createdAt: new Date(e.created_at as string).toISOString(),
+        ownerName: e.owner_name ? String(e.owner_name) : null, stageLabel: String(e.stage_label), visible: Boolean(e.visible),
+      })),
+    };
     if (enr[0]) {
       const e = mapEnrollment(enr[0]);
       const [pays, onb] = await Promise.all([
@@ -232,7 +241,7 @@ function bucketSql(tx: Tx, b: WorkBucket): Frag {
     case "uncontacted":
       return tx`i.first_contact_attempt_at is null`;
     case "new":
-      return tx`i.assigned_at > now() - interval '24 hours'`;
+      return tx`i.owner_opened_at is null`;
     case "payment":
       return tx`s.system_key = 'awaiting_payment'`;
     case "noaction":

@@ -1,8 +1,9 @@
 "use client";
 
+import { isUnopenedCustomer } from "@/lib/lead-row";
 import { AlertTriangle, CalendarClock, CheckCircle2, Hand, Inbox, ListChecks, Search, Users } from "lucide-react";
 import { useState } from "react";
-import { SupportStatusBadge } from "@/components/ui/badges";
+import { SupportStatusBadge, NewBadge } from "@/components/ui/badges";
 import { Button } from "@/components/ui/button";
 import { cn as clsx } from "@/components/ui/cn";
 import { Checkbox, Input, Select } from "@/components/ui/form";
@@ -21,10 +22,11 @@ function CustomerLine({ c, action }: { c: CustomerRow; action?: React.ReactNode 
   const total = c.onboarding.checklist.length;
   const overdue = c.nextDue && new Date(c.nextDue.dueAt) < now;
   return (
-    <li className="flex flex-wrap items-center gap-3 px-4 py-3">
+    <li className={clsx("flex flex-wrap items-center gap-3 px-4 py-3", isUnopenedCustomer(c.onboarding) && "bg-new-bg")} data-unopened={isUnopenedCustomer(c.onboarding) || undefined}>
       <button className="min-w-0 flex-1 text-left" onClick={() => openInquiry(c.inquiryId)}>
         <span className="flex flex-wrap items-center gap-2">
           <Name className="font-medium">{c.customerName}</Name>
+          {isUnopenedCustomer(c.onboarding) && <NewBadge />}
           {c.studentName && <span className="text-xs text-muted">Student: {c.studentName}</span>}
           <SupportStatusBadge status={c.onboarding.status} />
           {c.onboarding.flaggedForReview && <span className="inline-flex items-center gap-1 text-xs font-medium text-warn"><AlertTriangle size={12} aria-hidden /> Flagged</span>}

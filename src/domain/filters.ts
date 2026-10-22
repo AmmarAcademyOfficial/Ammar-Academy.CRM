@@ -12,6 +12,7 @@ export const EMPTY_FILTERS: LeadFilters = {
   courseTypeIds: [],
   followUp: "any",
   uncontactedOnly: false,
+  unopenedOnly: false,
   dateField: "created",
   dateFrom: "",
   dateTo: "",
@@ -20,6 +21,7 @@ export const EMPTY_FILTERS: LeadFilters = {
 /** Built-in views everyone gets. Sales see only their own leads anyway, so no owner filter is needed. */
 export const BUILT_IN_VIEWS: SavedView[] = [
   { id: "builtin-new", name: "My New Leads", builtIn: true, filters: { ...EMPTY_FILTERS, stageKeys: ["new"] } },
+  { id: "builtin-unopened", name: "Not Opened Yet", builtIn: true, filters: { ...EMPTY_FILTERS, unopenedOnly: true } },
   { id: "builtin-callbacks", name: "Callbacks Today", builtIn: true, filters: { ...EMPTY_FILTERS, followUp: "today" } },
   { id: "builtin-overdue", name: "Overdue", builtIn: true, filters: { ...EMPTY_FILTERS, followUp: "overdue" } },
   { id: "builtin-payment", name: "Awaiting Payment", builtIn: true, filters: { ...EMPTY_FILTERS, stageKeys: ["awaiting_payment"] } },
@@ -37,6 +39,7 @@ export function activeFilterCount(f: LeadFilters): number {
     (f.courseTypeIds?.length ?? 0) +
     (f.followUp !== "any" ? 1 : 0) +
     (f.uncontactedOnly ? 1 : 0) +
+    (f.unopenedOnly ? 1 : 0) +
     (f.dateFrom || f.dateTo ? 1 : 0)
   );
 }

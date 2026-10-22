@@ -15,6 +15,7 @@ const filters = z.object({
   courseTypeIds: z.array(z.string().uuid()).default([]),
   followUp: z.enum(["any", "today", "overdue", "none", "upcoming"]).default("any"),
   uncontactedOnly: z.boolean().default(false),
+  unopenedOnly: z.boolean().default(false),
   dateField: z.enum(["created", "assigned", "followUp", "lastContact"]).default("created"),
   dateFrom: z.string().regex(/^(\d{4}-\d{2}-\d{2})?$/).default(""),
   dateTo: z.string().regex(/^(\d{4}-\d{2}-\d{2})?$/).default(""),

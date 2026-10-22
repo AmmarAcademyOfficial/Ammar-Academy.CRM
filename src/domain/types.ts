@@ -160,6 +160,11 @@ export interface Inquiry {
   /** Optimistic-concurrency version, incremented on every save. */
   version: number;
   customFields: Record<ID, FieldValue>;
+  /** When the current sales owner first opened it; unset = still "new" (highlighted). */
+  ownerOpenedAt?: Timestamp;
+  assignmentMethod?: "round_robin" | "manual" | "creator" | "returning";
+  /** The same customer had an earlier inquiry. */
+  returningCustomer?: boolean;
 }
 
 export type ActivityType =
@@ -278,6 +283,8 @@ export interface Onboarding {
   activatedAt?: Timestamp;
   checklist: ChecklistItem[];
   flaggedForReview?: string;
+  /** When the support owner first opened the customer; unset = still "new" (highlighted). */
+  supportOpenedAt?: Timestamp;
   version: number;
 }
 
@@ -414,6 +421,8 @@ export interface LeadFilters {
   courseTypeIds: ID[];
   followUp: "any" | "today" | "overdue" | "none" | "upcoming";
   uncontactedOnly: boolean;
+  /** Assigned but not opened yet by the owner. */
+  unopenedOnly?: boolean;
   /** Which date the custom range applies to. */
   dateField: DateFilterField;
   /** Inclusive Cairo calendar dates, "YYYY-MM-DD". Empty = open-ended. */

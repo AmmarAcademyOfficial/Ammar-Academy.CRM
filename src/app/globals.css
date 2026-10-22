@@ -37,6 +37,12 @@
   --color-info: #1f5fa8;
   --color-info-bg: #e5effa;
 
+  /* New, not opened yet: soft yellow row, strong yellow label (text ~8:1). */
+  --color-new-bg: #fff8cc;
+  --color-new-bg-hover: #fff2a8;
+  --color-new-badge: #ffd84d;
+  --color-new-ink: #4a3a00;
+
   --radius-card: 12px;
   --shadow-panel: 0 12px 40px -12px rgb(14 15 59 / 0.28);
 }

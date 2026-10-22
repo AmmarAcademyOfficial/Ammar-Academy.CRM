@@ -92,6 +92,18 @@ export interface LeadDetail {
   activities: Activity[];
   followUps: FollowUp[];
   fieldValues: Record<ID, FieldValue>;
+  /** Earlier inquiries of the same customer (newest first). */
+  earlier: EarlierInquiry[];
+}
+
+export interface EarlierInquiry {
+  inquiryId: ID;
+  programCode: string;
+  createdAt: string;
+  ownerName: string | null;
+  stageLabel: string;
+  /** Whether the viewer may open it. */
+  visible: boolean;
 }
 
 export type WorkBucket = "overdue" | "today" | "uncontacted" | "new" | "payment" | "noaction";

@@ -3,19 +3,19 @@
 import { AlarmClock, CalendarClock, CircleDollarSign, PhoneCall, Sparkles, TriangleAlert } from "lucide-react";
 import { useMemo, useState } from "react";
 import { AvailabilityControl } from "@/components/layout/app-shell";
-import { StageBadge } from "@/components/ui/badges";
+import { StageBadge, NewBadge, ReturningBadge } from "@/components/ui/badges";
 import { cn as clsx } from "@/components/ui/cn";
 import { Card, CardHeader, EmptyState, Name, PageHeader, SkeletonRows, Stat } from "@/components/ui/misc";
 import type { MyWork, WorkBucket } from "@/domain/dto";
 import { followUpTiming, formatCairo, formatRelative } from "@/domain/rules";
-import { hydrate, type LeadRow } from "@/lib/lead-row";
+import { hydrate, type LeadRow, isUnopened } from "@/lib/lead-row";
 import { useApi, useWorkspace } from "@/lib/workspace";
 
 const META: Record<WorkBucket, { label: string; icon: React.ReactNode; tone?: "warn" | "bad"; empty: string }> = {
   overdue: { label: "Overdue follow-ups", icon: <AlarmClock size={14} />, tone: "bad", empty: "Nothing overdue. Nice work." },
   today: { label: "Due today", icon: <CalendarClock size={14} />, empty: "No more follow-ups due today." },
   uncontacted: { label: "Not yet contacted", icon: <PhoneCall size={14} />, tone: "warn", empty: "Every lead has at least one contact attempt." },
-  new: { label: "New (last 24 h)", icon: <Sparkles size={14} />, empty: "No new leads in the last 24 hours." },
+  new: { label: "New, not opened yet", icon: <Sparkles size={14} />, empty: "You have opened every lead assigned to you." },
   payment: { label: "Awaiting payment", icon: <CircleDollarSign size={14} />, empty: "No leads are waiting for payment." },
   noaction: { label: "No next action", icon: <TriangleAlert size={14} />, tone: "warn", empty: "Every contacted lead has a next step." },
 };
@@ -62,12 +62,14 @@ function WorkItem({ r, now, onOpen }: { r: LeadRow; now: Date; onOpen: () => voi
   const f = r.nextFollowUp;
   const t = f && followUpTiming(f, now);
   return (
-    <li>
-      <button onClick={onOpen} className="flex w-full flex-wrap items-center gap-x-4 gap-y-1.5 px-4 py-3 text-left hover:bg-navy-50/60">
+    <li className={clsx(isUnopened(r.inquiry) && "bg-new-bg")} data-unopened={isUnopened(r.inquiry) || undefined}>
+      <button onClick={onOpen} className={clsx("flex w-full flex-wrap items-center gap-x-4 gap-y-1.5 px-4 py-3 text-left", isUnopened(r.inquiry) ? "hover:bg-new-bg-hover" : "hover:bg-navy-50/60")}>
         <span className="min-w-0 flex-1 basis-56">
           <span className="flex items-center gap-2">
             <Name className="truncate font-medium">{r.contact.name}</Name>
             <span className="text-xs font-semibold text-muted">{r.program.code}</span>
+            {isUnopened(r.inquiry) && <NewBadge />}
+            {r.inquiry.returningCustomer && <ReturningBadge />}
           </span>
           <span dir="auto" className={clsx("block truncate text-sm", t === "overdue" ? "text-bad" : "text-muted")}>
             {f ? f.note : r.inquiry.firstContactAttemptAt ? "No next action set" : `Arrived ${formatRelative(r.inquiry.createdAt, now)}`}

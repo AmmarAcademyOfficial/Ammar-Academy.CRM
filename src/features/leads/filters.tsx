@@ -139,6 +139,7 @@ export function FilterDialog({ value, onApply, onClose }: { value: LeadFilters; 
             </label>
           ))}
           <Checkbox label="Not yet contacted" checked={f.uncontactedOnly} onChange={(v) => setF({ ...f, uncontactedOnly: v })} />
+          <Checkbox label="New, not opened yet" checked={!!f.unopenedOnly} onChange={(v) => setF({ ...f, unopenedOnly: v })} />
         </Group>
         <Group title="Course type">
           {db.courseTypes.filter((t) => !t.archived).map((t) => (
@@ -218,6 +219,7 @@ export function FilterChips({ value, onChange }: { value: LeadFilters; onChange:
   if (value.followUp !== "any") chips.push({ label: `Follow-up: ${FOLLOWUP_LABEL[value.followUp]}`, remove: () => onChange({ ...value, followUp: "any" }) });
   if (value.dateFrom || value.dateTo) chips.push({ label: dateRangeLabel(value), remove: () => onChange({ ...value, dateFrom: "", dateTo: "" }) });
   if (value.uncontactedOnly) chips.push({ label: "Not yet contacted", remove: () => onChange({ ...value, uncontactedOnly: false }) });
+  if (value.unopenedOnly) chips.push({ label: "New, not opened yet", remove: () => onChange({ ...value, unopenedOnly: false }) });
   if (!chips.length) return null;
   return (
     <div className="flex flex-wrap items-center gap-2">

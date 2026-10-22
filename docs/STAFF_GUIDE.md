@@ -5,8 +5,12 @@ A one-page guide for each role. Share the section that fits each person.
 ## Sales agents
 
 **Every shift**
-1. Open **My Work**. Work the lists from left to right: *Overdue follow-ups* → *Due today* → *Not yet contacted* → *New (last 24 h)*, then *Awaiting payment* and *No next action*.
+1. Open **My Work**. Work the lists from left to right: *Overdue follow-ups* → *Due today* → *Not yet contacted* → *New, not opened yet*, then *Awaiting payment* and *No next action*.
 2. In the side bar, **Available for new leads** shows whether you are receiving leads. Use **Pause new leads** for a break; it ends by itself at the end of your shift.
+
+**New leads and returning customers**
+- A lead you have not opened yet is highlighted in **yellow** with a **New** label (Leads, My Work). It turns normal as soon as **you** open it; a manager looking at it does not change it. **Leads → Not Opened Yet** lists them.
+- A **Returning customer** label means this person had a lead before (same phone number, main or second). New leads from a returning customer come to the agent who handled their last lead, with a notification, as long as you sell that program; you get it even off shift and see it next shift. If you are on leave, it goes to the next agent in turn. The panel lists their earlier leads.
 
 **For each lead**
 - Click the name to open the customer panel. Use **Call** or **WhatsApp**, then **Record outcome**. Only a recorded outcome counts as contact (and for your first-contact time in Reports).
@@ -23,7 +27,7 @@ You see only your own leads. You cannot confirm payments or reassign leads.
 
 ## Customer support
 
-1. **My Work → New customers**: customers handed over after a confirmed payment. Click **Assign to Me**. If two people click at once, only one gets the customer.
+1. **My Work → New customers**: customers handed over after a confirmed payment. Click **Assign to Me**. If two people click at once, only one gets the customer. A customer a manager assigns to you shows in **yellow** with a **New** label until you open it.
 2. Open the customer → **Support** tab: tick each **checklist** step as you do it, add **support follow-ups**, and leave notes.
 3. Set the status to **Active** once every checklist step is done (the CRM will not allow it earlier).
 4. A customer marked **Flagged** had a payment reversed; a manager will review it.

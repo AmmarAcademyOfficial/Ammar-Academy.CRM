@@ -131,6 +131,7 @@ export const mapOnboarding = (r: Row, items: Row[]): Onboarding => ({
   claimedAt: isoOpt(r.claimed_at),
   activatedAt: isoOpt(r.activated_at),
   flaggedForReview: strOpt(r.flagged_reason),
+  supportOpenedAt: isoOpt(r.support_opened_at),
   version: Number(r.version),
   checklist: items.map((i) => ({
     templateItemId: str(i.template_item_id),
@@ -216,6 +217,9 @@ export const mapLeadRow = (r: Row): LeadRowDTO => ({
     courseId: strOpt(r.course_id),
     version: Number(r.version),
     customFields: {},
+    ownerOpenedAt: isoOpt(r.owner_opened_at),
+    assignmentMethod: (r.assignment_method ?? undefined) as LeadRowDTO["inquiry"]["assignmentMethod"],
+    returningCustomer: Boolean(r.returning_customer),
   },
   contact: {
     id: str(r.contact_id),

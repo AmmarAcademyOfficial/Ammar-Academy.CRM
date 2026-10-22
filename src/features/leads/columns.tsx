@@ -1,8 +1,9 @@
 "use client";
 
+import { isUnopened } from "@/lib/lead-row";
 import { PhoneOff } from "lucide-react";
 import type { ReactNode } from "react";
-import { StageBadge, TagChip } from "@/components/ui/badges";
+import { StageBadge, TagChip, NewBadge, ReturningBadge } from "@/components/ui/badges";
 import { Name, PhoneText } from "@/components/ui/misc";
 import { followUpTiming, formatCairo, formatRelative } from "@/domain/rules";
 import type { LeadSortKey } from "@/domain/dto";
@@ -31,6 +32,8 @@ export const COLUMNS: Column[] = [
         <p className="flex items-center gap-1.5 font-medium">
           <Name className="truncate">{r.contact.name}</Name>
           {r.contact.doNotContact && <PhoneOff size={13} className="shrink-0 text-bad" aria-label="Do Not Contact" />}
+          {isUnopened(r.inquiry) && <NewBadge />}
+          {r.inquiry.returningCustomer && <ReturningBadge />}
         </p>
         {r.inquiry.studentName && (
           <p className="truncate text-xs text-muted">

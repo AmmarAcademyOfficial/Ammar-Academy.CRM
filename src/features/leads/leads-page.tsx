@@ -2,7 +2,7 @@
 
 import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Columns3, Inbox, Plus, Save, Search, SlidersHorizontal, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { StageBadge, TAG_COLORS } from "@/components/ui/badges";
+import { StageBadge, TAG_COLORS, NewBadge, ReturningBadge } from "@/components/ui/badges";
 import { Button, IconButton } from "@/components/ui/button";
 import { cn as clsx } from "@/components/ui/cn";
 import { Checkbox, Field, Input } from "@/components/ui/form";
@@ -12,7 +12,7 @@ import type { LeadPage, LeadQuery, LeadSortKey } from "@/domain/dto";
 import { activeFilterCount, BUILT_IN_VIEWS, EMPTY_FILTERS } from "@/domain/filters";
 import { followUpTiming, formatCairo } from "@/domain/rules";
 import type { LeadFilters } from "@/domain/types";
-import { hydrate } from "@/lib/lead-row";
+import { hydrate, isUnopened } from "@/lib/lead-row";
 import { useRunAction } from "@/lib/run-action";
 import { useApi, useWorkspace } from "@/lib/workspace";
 import { deleteView, saveView, setColumns } from "@/server/actions";
@@ -166,7 +166,8 @@ export function LeadsPage() {
                     <tr
                       key={r.inquiry.id}
                       onClick={() => openInquiry(r.inquiry.id)}
-                      className="cursor-pointer border-b border-line/70 last:border-0 hover:bg-navy-50/60"
+                      data-unopened={isUnopened(r.inquiry) || undefined}
+                      className={clsx("cursor-pointer border-b border-line/70 last:border-0", isUnopened(r.inquiry) ? "bg-new-bg hover:bg-new-bg-hover" : "hover:bg-navy-50/60")}
                       style={{ boxShadow: r.primaryTag ? `inset 4px 0 0 ${TAG_COLORS[r.primaryTag.color].dot}` : undefined }}
                     >
                       {columns.map((c, i) => (
@@ -191,10 +192,14 @@ export function LeadsPage() {
                 const f = r.nextFollowUp;
                 const t = f && followUpTiming(f, now);
                 return (
-                  <li key={r.inquiry.id} style={{ boxShadow: r.primaryTag ? `inset 4px 0 0 ${TAG_COLORS[r.primaryTag.color].dot}` : undefined }}>
+                  <li key={r.inquiry.id} className={clsx(isUnopened(r.inquiry) && "bg-new-bg")} style={{ boxShadow: r.primaryTag ? `inset 4px 0 0 ${TAG_COLORS[r.primaryTag.color].dot}` : undefined }}>
                     <button className="flex w-full flex-col gap-1.5 px-4 py-3 text-left" onClick={() => openInquiry(r.inquiry.id)}>
                       <span className="flex w-full items-center justify-between gap-2">
-                        <Name className="truncate font-medium">{r.contact.name}</Name>
+                        <span className="flex min-w-0 items-center gap-1.5">
+                          <Name className="truncate font-medium">{r.contact.name}</Name>
+                          {isUnopened(r.inquiry) && <NewBadge />}
+                          {r.inquiry.returningCustomer && <ReturningBadge />}
+                        </span>
                         <span className="text-xs font-semibold text-muted">{r.program.code}</span>
                       </span>
                       <span className="flex flex-wrap items-center gap-2 text-xs">

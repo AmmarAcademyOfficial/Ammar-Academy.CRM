@@ -224,6 +224,13 @@ export async function seedDev(admin) {
   await shift(ids.mariam, 5, "14:00", "22:00", [programs.IELTS]);
   await asUser(manager, "select public.save_time_off($1, (now() at time zone 'Africa/Cairo')::date + 7, (now() at time zone 'Africa/Cairo')::date + 9, 'Family event')", [ids.mariam]);
 
+  // Same rule as the live data when "New" highlighting started: leads someone already tried to
+  // contact (or closed) count as opened; uncontacted open leads show as new.
+  await q(`update public.inquiries i set owner_opened_at = coalesce(i.first_contact_attempt_at, i.assigned_at, i.created_at)
+           where i.sales_owner_id is not null and (i.first_contact_attempt_at is not null
+             or exists (select 1 from public.stages s where s.id = i.stage_id and s.is_closed))`);
+  await q("update public.onboardings set support_opened_at = claimed_at where claimed_at is not null and support_opened_at is null");
+
   await q("update public.audit_log set created_at = now() - interval '2 days' where created_at > now() - interval '1 minute'");
   return ids;
 }

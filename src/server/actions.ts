@@ -244,6 +244,24 @@ export async function updateSettings(patch: Partial<Settings>): Promise<Result<v
   });
 }
 
+// ── Opened ("New" highlight) ─────────────────────────────────────────────
+
+/** The sales owner opened the lead: it stops being highlighted as new. Others opening it change nothing. */
+export async function markLeadOpened(inquiryId: string): Promise<Result<boolean>> {
+  return attempt(async () => {
+    const [r] = await run((tx) => tx<{ ok: boolean }[]>`select public.mark_inquiry_opened(${check(uuid, inquiryId)}) as ok`);
+    return Boolean(r?.ok);
+  });
+}
+
+/** The support owner opened the customer: it stops being highlighted as new. */
+export async function markCustomerOpened(inquiryId: string): Promise<Result<boolean>> {
+  return attempt(async () => {
+    const [r] = await run((tx) => tx<{ ok: boolean }[]>`select public.mark_onboarding_opened(${check(uuid, inquiryId)}) as ok`);
+    return Boolean(r?.ok);
+  });
+}
+
 // ── Staff accounts ───────────────────────────────────────────────────────
 
 /** Same rules as the Supabase project (supabase/config.toml): 10+ characters, upper and lower case, a digit. */

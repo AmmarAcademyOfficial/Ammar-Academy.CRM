@@ -17,7 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { DncBadge, Pill, StageBadge, TAG_COLORS, TagChip } from "@/components/ui/badges";
+import { DncBadge, Pill, ReturningBadge, StageBadge, TAG_COLORS, TagChip } from "@/components/ui/badges";
 import { Button, IconButton } from "@/components/ui/button";
 import { cn as clsx } from "@/components/ui/cn";
 import { DiscardDialog } from "@/components/ui/confirm";
@@ -31,7 +31,7 @@ import type { ID, StageKey } from "@/domain/types";
 import { hydrate, profileName } from "@/lib/lead-row";
 import { useRunAction } from "@/lib/run-action";
 import { useApi, useWorkspace } from "@/lib/workspace";
-import { addNote, changeStage, completeFollowUp, logShortcut, setDoNotContact, setNoFollowUpReason, setReserved } from "@/server/actions";
+import { addNote, changeStage, completeFollowUp, logShortcut, markCustomerOpened, markLeadOpened, setDoNotContact, setNoFollowUpReason, setReserved } from "@/server/actions";
 import { addSupportNote, setInquiryCourse } from "@/server/payment-actions";
 import { priceText } from "@/lib/courses";
 import type { LeadRow } from "@/lib/lead-row";
@@ -69,7 +69,7 @@ export function LeadPanelHost() {
 }
 
 function LeadPanel({ inquiryId, onClose, onDirtyChange }: { inquiryId: ID; onClose: () => void; onDirtyChange: (d: boolean) => void }) {
-  const { me, ref, now } = useWorkspace();
+  const { me, ref, now, openInquiry } = useWorkspace();
   const runAction = useRunAction();
   const { data, error, loading, reload } = useApi<LeadDetail>(`/api/leads/${inquiryId}`);
   // Support staff open a customer on the Support tab; everyone else on Activity.
@@ -83,6 +83,18 @@ function LeadPanel({ inquiryId, onClose, onDirtyChange }: { inquiryId: ID; onClo
   const noteRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => onDirtyChange(note.trim().length > 0 || detailsDirty), [note, detailsDirty, onDirtyChange]);
+
+  // The owner opening the record clears its yellow "New" highlight (once; others opening it change nothing).
+  const markedRef = useRef(false);
+  useEffect(() => {
+    if (!data || markedRef.current) return;
+    const q = data.row.inquiry;
+    const salesOwnerFirstOpen = me.role === "sales" && q.salesOwnerId === me.id && !q.ownerOpenedAt;
+    const supportOwnerFirstOpen = me.role === "support" && data.onboarding?.supportOwnerId === me.id && !data.onboarding.supportOpenedAt;
+    if (!salesOwnerFirstOpen && !supportOwnerFirstOpen) return;
+    markedRef.current = true;
+    void runAction(salesOwnerFirstOpen ? markLeadOpened(q.id) : markCustomerOpened(q.id), null, { quiet: true });
+  }, [data, me.id, me.role, runAction]);
 
   const row = useMemo(() => (data ? hydrate(data.row, ref) : null), [data, ref]);
 
@@ -146,6 +158,7 @@ function LeadPanel({ inquiryId, onClose, onDirtyChange }: { inquiryId: ID; onClo
               <h2 className="text-lg font-semibold leading-tight"><Name>{row.contact.name}</Name></h2>
               {dnc && <DncBadge />}
               {q.reserved && <Pill className="bg-navy-100 text-navy-800" icon={<BookmarkCheck size={12} aria-hidden />}>Reserved (not paid)</Pill>}
+              {data.earlier.length > 0 && <ReturningBadge />}
             </div>
             <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm text-muted">
               {q.studentName && <span>Student: <Name className="text-ink">{q.studentName}</Name> ·</span>}
@@ -187,6 +200,26 @@ function LeadPanel({ inquiryId, onClose, onDirtyChange }: { inquiryId: ID; onClo
             </button>
           )}
         </div>
+
+        {data.earlier.length > 0 && (
+          <section aria-label="Earlier leads" className="mx-5 mb-3 rounded-xl border border-info/20 bg-info-bg/60 px-3 py-2 text-sm">
+            <p className="text-xs font-semibold text-info">Returning customer · {data.earlier.length} earlier lead{data.earlier.length === 1 ? "" : "s"}</p>
+            <ul className="mt-1 space-y-0.5">
+              {data.earlier.slice(0, 5).map((e) => {
+                const text = `${e.programCode} · ${formatCairo(e.createdAt, "date")} · ${e.ownerName ?? "Unassigned"} · ${e.stageLabel}`;
+                return (
+                  <li key={e.inquiryId} className="text-xs text-ink">
+                    {e.visible ? (
+                      <button className="text-left underline decoration-info/40 underline-offset-2 hover:text-info" onClick={() => openInquiry(e.inquiryId)}>{text}</button>
+                    ) : (
+                      text
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
 
         <div className="mx-5 mb-3 grid gap-2 rounded-xl bg-canvas p-3 text-sm sm:grid-cols-[auto_1fr]">
           <div className="sm:border-r sm:border-line sm:pr-4">
