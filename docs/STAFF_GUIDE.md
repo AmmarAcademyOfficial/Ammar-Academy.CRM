@@ -46,11 +46,24 @@ You see only your own leads. You cannot confirm payments or reassign leads.
 
 You see handed-over customers only (the queue and your own), never sales prospects.
 
+## Accountant
+
+The accountant sees **Accounting** only: payments and balances by customer name and amount (no phone numbers, no leads).
+
+1. Choose the period at the top: *Today*, *This week* (from Sunday), *This month*, *This Academy month* (26th to 25th), *Last Academy month*, or custom dates. Narrow by program, course type, course, sales agent, support agent or payment method.
+2. **Overview**: money in (confirmed payments, by the date the customer paid), payments waiting for review, what customers still owe, and overdue planned payments; money in per day; totals by course type, payment type, program and method. EGP and USD are never added together.
+3. **Payments**: open a receipt, then **Confirm** or **Reject** payments waiting for review; click any payment to see it in full or **Reverse** one that bounced. **Download CSV** for Excel.
+4. **Customers**: agreed total, paid, balance left, next planned payment and overdue amount for every enrolled customer.
+5. **Sales agents**: confirmed money per agent (credited to the agent who made the sale, later installments included), number of payments, new enrollments, and a per-day table.
+
+You are notified when a payment is submitted for review and when a planned payment is overdue.
+
 ## Managers
 
 **Daily**
 - **Overview**: new leads, the waiting queue (**Run assignment now**), who is on shift, Google Sheets health, payments to confirm.
 - **Payments**: open each receipt, then **Confirm** or **Reject** (with a reason). **Reverse** a confirmed payment that bounced. Each payment shows its type and who recorded it (sales or support).
+- **Accounting**: the same views as the accountant, plus clicking a customer opens their full record.
 - **Support → Payments due**: overdue and upcoming planned payments for every support agent's customers (filter by agent with the owner filter).
 - **Needs Review**: sheet rows the CRM could not import safely; fix and import, or dismiss with a reason.
 
@@ -63,7 +76,7 @@ You see handed-over customers only (the queue and your own), never sales prospec
 - **Settings → Audit History**: who changed what (roles, reassignments, prices, payment decisions, settings).
 
 **Staff accounts** (*Settings → Users and Roles*):
-- **Add user**: name, email, role, then either **Set a password now** (they can sign in straight away) or **Email them an invitation link** (they choose their own password).
+- **Add user**: name, email, role (*Accountant* sees Accounting only, without phone numbers), then either **Set a password now** (they can sign in straight away) or **Email them an invitation link** (they choose their own password).
 - **Set password** on any active person replaces their password immediately, for example when someone forgets it. Passwords need at least 10 characters with an uppercase letter, a lowercase letter and a number. Tell people their password in person, never by chat. Each change is recorded in **Audit History** (the password itself is never stored or shown).
 
 **Settings you own**: users and roles, shifts, courses and prices, customer fields, stages, tags, follow-up rules, notifications, payment handover rule and deposit per program, the support checklist, Google Sheets connections.

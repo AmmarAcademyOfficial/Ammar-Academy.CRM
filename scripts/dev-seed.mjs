@@ -11,6 +11,7 @@ const STAFF = [
   ["Youssef Adel", "youssef@example.test", "sales"],
   ["Mariam Samir", "mariam@example.test", "sales"],
   ["Laila Ibrahim", "laila@example.test", "support"],
+  ["Karim Fawzy", "karim@example.test", "accountant"],
 ];
 
 // [name, phone, program, owner, stage, outcome, hoursAgo, follow-up [hoursFromNow, note], extras]

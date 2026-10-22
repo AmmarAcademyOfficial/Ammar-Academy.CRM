@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  Calculator,
   CalendarClock,
   CreditCard,
   Headset,
@@ -34,13 +35,16 @@ export const NAV: Record<Role, NavItem[]> = {
     { path: "/leads", label: "Leads", icon: Users },
     { path: "/customers", label: "Support", icon: Headset },
     { path: "/payments", label: "Payments", icon: CreditCard },
+    { path: "/accounting", label: "Accounting", icon: Calculator },
     { path: "/reports", label: "Reports", icon: BarChart3 },
     { path: "/settings", label: "Settings", icon: Settings },
   ],
+  accountant: [{ path: "/accounting", label: "Accounting", icon: Calculator }],
 };
 
 export const HOME: Record<Role, string> = {
   sales: "/my-work",
   support: "/my-work",
   manager: "/overview",
+  accountant: "/accounting",
 };

@@ -5,7 +5,7 @@
  * shape of rows returned from Supabase; the prototype store uses them directly.
  */
 
-export type Role = "manager" | "sales" | "support";
+export type Role = "manager" | "sales" | "support" | "accountant";
 
 export type ID = string;
 

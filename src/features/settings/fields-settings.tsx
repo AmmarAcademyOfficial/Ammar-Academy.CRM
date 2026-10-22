@@ -23,7 +23,7 @@ const IMPORTANCE: Record<FieldImportance, [string, string]> = {
   additional: ["Additional", "bg-[#eeeff3] text-[#4b4e66]"],
 };
 const ROLES: Role[] = ["manager", "sales", "support"];
-const SHORT_ROLE: Record<Role, string> = { manager: "Manager", sales: "Sales", support: "Support" };
+const SHORT_ROLE: Record<Role, string> = { manager: "Manager", sales: "Sales", support: "Support", accountant: "Accountant" };
 
 /** The protected core fields always exist and are not stored as custom fields. */
 const CORE = ["Name", "Main phone", "Program", "Contact type", "Student name", "Additional phone", "Sales owner", "Stage"];

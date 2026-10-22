@@ -122,7 +122,7 @@ export function SubmissionItem({ p, currency, customer }: { p: PaymentSubmission
   const [mode, setMode] = useState<null | "reject" | "reverse">(null);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
-  const isManager = me.role === "manager";
+  const isManager = me.role === "manager" || me.role === "accountant"; // may decide payments
 
   const confirm = async () => {
     setBusy(true);

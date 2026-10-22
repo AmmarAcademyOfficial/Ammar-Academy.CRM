@@ -1,7 +1,7 @@
 import pg from "pg";
 import { inject } from "vitest";
 
-export type Role = "manager" | "sales" | "support";
+export type Role = "manager" | "sales" | "support" | "accountant";
 export interface TestUser {
   id: string;
   name: string;

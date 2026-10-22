@@ -52,9 +52,19 @@ export function WorkspaceProvider({ me, reference, serverNow, children }: { me: 
     [router],
   );
 
+  // Accountants have no customer panel (no access to leads or phone numbers): a notification about
+  // a customer takes them to the payments in Accounting instead.
+  const openInquiry = useCallback(
+    (id: ID | null) => {
+      if (me.role !== "accountant") setOpenInquiryId(id);
+      else if (id) router.push("/accounting?tab=payments");
+    },
+    [me.role, router],
+  );
+
   const value = useMemo<Workspace>(
-    () => ({ me, ref: reference, now, openInquiryId, openInquiry: setOpenInquiryId, dataVersion, invalidate }),
-    [me, reference, now, openInquiryId, dataVersion, invalidate],
+    () => ({ me, ref: reference, now, openInquiryId, openInquiry, dataVersion, invalidate }),
+    [me, reference, now, openInquiryId, openInquiry, dataVersion, invalidate],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

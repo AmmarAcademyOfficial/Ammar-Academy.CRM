@@ -40,6 +40,7 @@ const MATRIX: Record<Role, Action[]> = {
   ],
   sales: ["inquiry.create", "payment.submit", "user.pause.self"],
   support: ["support.claim", "support.updateStatus"],
+  accountant: ["payment.decide"],
 };
 
 export function can(role: Role, action: Action, opts?: { agentsCanCreateTags?: boolean }): boolean {
@@ -85,4 +86,5 @@ export const ROLE_LABEL: Record<Role, string> = {
   manager: "Manager",
   sales: "Sales Agent",
   support: "Customer Support",
+  accountant: "Accountant",
 };

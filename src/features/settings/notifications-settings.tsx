@@ -11,7 +11,7 @@ import { useWorkspace } from "@/lib/workspace";
 import { setNotificationRule, updateSettings } from "@/server/actions";
 import { NumberSetting } from "./settings-page";
 
-const WHO: Record<Role, string> = { sales: "Sales agents", support: "Customer support", manager: "Managers" };
+const WHO: Record<Role, string> = { sales: "Sales agents", support: "Customer support", manager: "Managers", accountant: "Accountants" };
 
 /** Settings → Notifications: what each role is told, whether it pops up with a sound, and timing. */
 export function NotificationsSettings() {

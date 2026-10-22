@@ -318,3 +318,49 @@ export interface ReportData {
   courseTypes: ReportCourseTypeRow[];
   support: { handedOver: number; claimed: number; medianClaimMinutes: number | null; activated: number };
 }
+
+// ── Accounting (phase 2) ─────────────────────────────────────────────────
+
+/** A payment as Accounting sees it: names and amounts, never phone numbers. */
+export interface AccountingPayment {
+  payment: PaymentSubmission;
+  currency: string;
+  enrollmentId: ID;
+  inquiryId: ID;
+  customerName: string;
+  studentName?: string;
+  programId: ID;
+  courseId: ID;
+  courseTypeId: ID | null;
+  /** The sales agent who made the sale (credited for every payment of it). */
+  salesAgentId: ID | null;
+  supportOwnerId: ID | null;
+}
+
+export interface AccountingCustomer {
+  enrollmentId: ID;
+  inquiryId: ID;
+  customerName: string;
+  studentName?: string;
+  programId: ID;
+  courseId: ID;
+  courseTypeId: ID | null;
+  currency: string;
+  agreed: number;
+  paid: number;
+  pending: number;
+  balance: number;
+  enrolledAt: string;
+  handedOverAt?: string;
+  salesAgentId: ID | null;
+  supportOwnerId: ID | null;
+  nextDue?: { dueOn: string; left: number; status: PaymentDue["status"] };
+  overdueLeft: number;
+  overdueSince?: string;
+}
+
+export interface AccountingData {
+  range: { from: string; to: string };
+  payments: AccountingPayment[];
+  customers: AccountingCustomer[];
+}

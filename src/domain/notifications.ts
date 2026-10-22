@@ -34,9 +34,9 @@ export const NOTIFICATION_GROUPS: { title: string; events: NotificationEvent[] }
   {
     title: "Payments and support",
     events: [
-      { key: "payment_to_review", label: "Payment to review", description: "An agent or support submitted a payment receipt.", roles: ["manager"] },
+      { key: "payment_to_review", label: "Payment to review", description: "An agent or support submitted a payment receipt.", roles: ["manager", "accountant"] },
       { key: "payment_due_soon", label: "Payment due soon", description: "A planned payment is due soon (the days are set under Timing). To the customer's support owner, or the sales agent before handover.", roles: ["support", "sales"] },
-      { key: "payment_overdue", label: "Payment overdue", description: "A planned payment was not paid by its date: the day after, then weekly while unpaid.", roles: ["support", "sales", "manager"] },
+      { key: "payment_overdue", label: "Payment overdue", description: "A planned payment was not paid by its date: the day after, then weekly while unpaid.", roles: ["support", "sales", "manager", "accountant"] },
       { key: "payment_update", label: "Payment confirmed, rejected or reversed", description: "A decision on a payment the person submitted.", roles: ["sales", "support"] },
       { key: "handed_over", label: "Customer handed over to support", description: "The agent's customer enrolled and moved to support.", roles: ["sales"] },
       { key: "new_customer_ready", label: "New customer ready for onboarding", description: "A newly enrolled customer is waiting for support.", roles: ["support"] },
@@ -52,4 +52,4 @@ export const NOTIFICATION_GROUPS: { title: string; events: NotificationEvent[] }
   },
 ];
 
-export const NOTIFICATION_ROLES: Role[] = ["sales", "support", "manager"];
+export const NOTIFICATION_ROLES: Role[] = ["sales", "support", "manager", "accountant"];

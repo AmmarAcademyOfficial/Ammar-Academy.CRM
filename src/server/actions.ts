@@ -278,7 +278,7 @@ const staffPassword = z
 const inviteSchema = z.object({
   fullName: z.string().trim().min(1, "Add the person's name").max(120),
   email: z.string().trim().email("Enter a valid email address"),
-  role: z.enum(["manager", "sales", "support"]),
+  role: z.enum(["manager", "sales", "support", "accountant"]),
   // Optional: set a password now instead of emailing an invitation link.
   password: z.union([z.literal(""), staffPassword]).optional(),
 });
@@ -361,7 +361,7 @@ export async function setUserActive(userId: string, active: boolean, redistribut
 
 export async function setUserRole(userId: string, role: Role): Promise<Result<void>> {
   return attempt(async () => {
-    await run((tx) => tx`select public.set_user_role(${check(uuid, userId)}, ${check(z.enum(["manager", "sales", "support"]), role)}::public.app_role)`);
+    await run((tx) => tx`select public.set_user_role(${check(uuid, userId)}, ${check(z.enum(["manager", "sales", "support", "accountant"]), role)}::public.app_role)`);
     refreshReference();
   });
 }
@@ -411,7 +411,7 @@ export async function setColumns(keys: string[]): Promise<Result<void>> {
 export async function setNotificationRule(event: string, role: Role, enabled: boolean, popup: boolean): Promise<Result<void>> {
   return attempt(async () => {
     const ev = check(z.string().regex(/^[a-z_]{1,40}$/), event);
-    const r = check(z.enum(["manager", "sales", "support"]), role);
+    const r = check(z.enum(["manager", "sales", "support", "accountant"]), role);
     await run((tx) => tx`select public.set_notification_rule(${ev}, ${r}, ${Boolean(enabled)}, ${Boolean(popup)})`);
     refreshReference();
   });

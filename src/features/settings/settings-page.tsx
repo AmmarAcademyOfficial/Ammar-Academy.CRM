@@ -122,7 +122,7 @@ function UsersSection() {
                 </td>
                 <td className="px-3 py-2.5">
                   <Select aria-label={`Role for ${u.fullName}`} value={u.role} onChange={(e) => runAction(setUserRole(u.id, e.target.value as Role), "Role changed", { reference: true })} className="h-8 w-auto py-0 text-[13px]">
-                    {(["manager", "sales", "support"] as Role[]).map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
+                    {(["manager", "sales", "support", "accountant"] as Role[]).map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
                   </Select>
                 </td>
                 {ref.settings.perAgentLeadCapEnabled && (
@@ -235,6 +235,7 @@ function InviteDialog({ onClose }: { onClose: () => void }) {
               <option value="sales">Sales Agent</option>
               <option value="support">Customer Support</option>
               <option value="manager">Manager</option>
+              <option value="accountant">Accountant (Accounting only, no phone numbers)</option>
             </Select>
           )}
         </Field>
