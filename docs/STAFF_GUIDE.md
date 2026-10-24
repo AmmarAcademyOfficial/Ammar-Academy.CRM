@@ -57,6 +57,7 @@ The accountant sees **Accounting** only: payments and balances by customer name 
 3. **Payments**: open a receipt, then **Confirm** or **Reject** payments waiting for review; click any payment to see it in full or **Reverse** one that bounced. **Download CSV** for Excel.
 4. **Customers**: agreed total, paid, balance left, next planned payment and overdue amount for every enrolled customer.
 5. **Sales agents**: confirmed money per agent (credited to the agent who made the sale, later installments included), number of payments, new enrollments, and a per-day table.
+6. **Teachers**: salaries per Academy month (26th to 25th, named after the month it ends in, so *November 2026* is 26 Oct – 25 Nov). Each teacher's pay is the hours support recorded × the hourly rate on each session's day (a rate change mid-month shows as two lines; a group class is paid once). Use the arrows to change month. **Bonus or deduction** (or **Add** on a teacher) adds a line with a reason, for example *Extra mock exam*; remove it with the bin icon while the month is open. A warning shows past sessions that are not recorded yet, because they are not counted. **Export CSV** for Excel. Totals are per currency.
 
 You are notified when a payment is submitted for review and when a planned payment is overdue.
 
@@ -66,6 +67,7 @@ You are notified when a payment is submitted for review and when a planned payme
 - **Overview**: new leads, the waiting queue (**Run assignment now**), who is on shift, Google Sheets health, payments to confirm.
 - **Payments**: open each receipt, then **Confirm** or **Reject** (with a reason). **Reverse** a confirmed payment that bounced. Each payment shows its type and who recorded it (sales or support).
 - **Accounting**: the same views as the accountant, plus clicking a customer opens their full record.
+- **Accounting → Teachers → Close month** (after the 25th): checks every session is recorded, then freezes that month's salaries. Sessions in a closed month can no longer change, and bonuses and deductions are locked. **Reopen** (with a reason) if something must be corrected; the reason is kept in the audit history.
 - **Support → Payments due**: overdue and upcoming planned payments for every support agent's customers (filter by agent with the owner filter).
 - **Needs Review**: sheet rows the CRM could not import safely; fix and import, or dismiss with a reason.
 

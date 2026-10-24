@@ -1,9 +1,10 @@
 import { cn as clsx } from "./cn";
-import type { ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import { formatPhone } from "@/domain/rules";
 
-export function Card({ children, className, as: Tag = "section" }: { children: ReactNode; className?: string; as?: "section" | "div" | "article" }) {
-  return <Tag className={clsx("rounded-[var(--radius-card)] border border-line bg-white", className)}>{children}</Tag>;
+export function Card({ children, className, as: Tag = "section", ...rest }: { children: ReactNode; className?: string; as?: "section" | "div" | "article" } & Omit<ComponentProps<"section">, "className" | "children" | "ref">) {
+  // Extra attributes (data-*, aria-*) are passed through, so tests and assistive tech can find a card.
+  return <Tag {...rest} className={clsx("rounded-[var(--radius-card)] border border-line bg-white", className)}>{children}</Tag>;
 }
 
 export function CardHeader({ title, action, subtitle, count }: { title: ReactNode; action?: ReactNode; subtitle?: ReactNode; count?: number }) {

@@ -11,6 +11,7 @@ import re
 import sys
 
 from playwright.sync_api import expect, sync_playwright
+import hydration  # noqa: F401  (waits for the page to be interactive after each load)
 
 PW = re.compile(r"^Password")
 BASE = "http://localhost:3000"

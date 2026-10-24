@@ -398,3 +398,52 @@ export interface SessionsData {
   unrecorded: TeachingSession[];
   assignments: SessionAssignment[];
 }
+
+/** Phase 5: one pay line of a teacher for an Academy month (one per rate and amount per hour). */
+export interface SalaryLine {
+  rateId: string;
+  rateName: string;
+  currency: string;
+  /** Null when the rate had no amount on a session's day (blocks closing the month). */
+  perHour: number | null;
+  hours: number;
+  sessions: number;
+  amount: number | null;
+}
+
+export interface SalaryAdjustment {
+  id: string;
+  kind: "bonus" | "deduction";
+  amount: number;
+  currency: string;
+  note: string;
+  createdBy: string | null;
+  createdAt: string;
+}
+
+export interface SalaryTeacher {
+  teacherId: string;
+  name: string;
+  lines: SalaryLine[];
+  adjustments: SalaryAdjustment[];
+  /** Pay + bonuses − deductions, per currency (never summed across currencies). */
+  totals: Record<string, number>;
+}
+
+export interface SalaryReport {
+  /** "YYYY-MM": the month the Academy month ends in. */
+  month: string;
+  from: string;
+  to: string;
+  status: "open" | "closed";
+  closedAt: string | null;
+  closedBy: string | null;
+  reopenReason: string | null;
+  teachers: SalaryTeacher[];
+  totals: Record<string, number>;
+  /** Past sessions in the month still marked scheduled. */
+  unrecorded: number;
+  missingRates: number;
+  /** The month's last day (the 25th) has passed. */
+  ended: boolean;
+}
