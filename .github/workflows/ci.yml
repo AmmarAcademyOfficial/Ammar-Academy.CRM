@@ -15,7 +15,7 @@ concurrency:
 jobs:
   checks:
     name: Lint, types, unit and database tests, build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # pinned: Playwright 1.56 cannot install Chromium on ubuntu-latest (26.04)
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -33,7 +33,7 @@ jobs:
   browser:
     name: Browser journeys, accessibility and console scan
     needs: checks
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # pinned: Playwright 1.56 cannot install Chromium on ubuntu-latest (26.04)
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
