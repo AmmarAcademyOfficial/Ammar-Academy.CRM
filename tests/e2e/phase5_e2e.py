@@ -133,9 +133,10 @@ with sync_playwright() as p:
     expect(m.get_by_role("heading", name="Audit History", exact=True)).to_be_visible()
     total = sql("select count(*)::int as n from public.audit_log")[0]["n"]
     m.get_by_placeholder("Search action or record").fill("course")
-    m.wait_for_timeout(600)
-    shown = m.get_by_role("list", name="Audit entries").get_by_role("listitem").count()
     expected = sql("select count(*)::int as n from public.audit_log where action ilike '%course%' or target ilike '%course%'")[0]["n"]
+    # Wait for the search to land (a fixed pause was too short on slow machines).
+    expect(m.get_by_role("list", name="Audit entries").get_by_role("listitem")).to_have_count(min(expected, 50))
+    shown = m.get_by_role("list", name="Audit entries").get_by_role("listitem").count()
     check("Audit history search", shown == min(expected, 50) and expected < total, f"{expected} of {total} entries")
     shot(m, "02-audit")
     check("Sales cannot read the audit history", s.request.get(f"{BASE}/api/audit").status == 403)

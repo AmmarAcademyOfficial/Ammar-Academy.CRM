@@ -447,3 +447,62 @@ export interface SalaryReport {
   /** The month's last day (the 25th) has passed. */
   ended: boolean;
 }
+
+/** Part B: the Enrollments list (one row per enrollment). */
+export type EnrollmentStatus = "not_handed_over" | "new_customer" | "onboarding" | "active" | "flagged";
+export type PaymentState = "paid" | "balance" | "overdue" | "pending" | "none";
+export interface EnrollmentFilters {
+  search: string;
+  programIds: string[];
+  courseTypeIds: string[];
+  courseIds: string[];
+  teacherIds: string[];
+  /** Profile ids, or "none". */
+  salesAgentIds: string[];
+  supportOwnerIds: string[];
+  statuses: EnrollmentStatus[];
+  paymentStates: PaymentState[];
+  currency: string;
+  enrolledFrom: string;
+  enrolledTo: string;
+  startFrom: string;
+  startTo: string;
+}
+export type EnrollmentSortKey = "customer" | "course" | "enrolled" | "start" | "sales" | "support" | "paid" | "balance" | "next_due" | "overdue" | "last_paid";
+export interface EnrollmentListRow {
+  enrollmentId: string;
+  inquiryId: string;
+  customerName: string;
+  /** Null for accountants. */
+  phone: string | null;
+  studentName: string | null;
+  programId: string;
+  courseId: string;
+  courseTypeId: string | null;
+  courseStart: string | null;
+  enrolledAt: string;
+  salesAgentId: string | null;
+  supportOwnerId: string | null;
+  status: EnrollmentStatus;
+  currency: string;
+  agreed: number;
+  paid: number;
+  pending: number;
+  balance: number;
+  lastPaidOn: string | null;
+  nextDueOn: string | null;
+  nextDueLeft: number | null;
+  overdueLeft: number;
+  teacherIds: string[];
+  teacherNames: string | null;
+  packageHours: number | null;
+  packageUsed: number | null;
+}
+export interface EnrollmentList {
+  total: number;
+  page: number;
+  pageSize: number;
+  scope: "mine" | "all";
+  totals: { currency: string; count: number; agreed: number; paid: number; balance: number; overdue: number }[];
+  rows: EnrollmentListRow[];
+}
