@@ -14,6 +14,7 @@ import { followUpTiming, formatCairo } from "@/domain/rules";
 import type { LeadFilters } from "@/domain/types";
 import { hydrate, isUnopened } from "@/lib/lead-row";
 import { useRunAction } from "@/lib/run-action";
+import { DownloadExcelButton } from "@/lib/download-excel";
 import { useApi, useWorkspace } from "@/lib/workspace";
 import { deleteView, saveView, setColumns } from "@/server/actions";
 import { AddCustomerDialog } from "./add-customer";
@@ -147,6 +148,7 @@ export function LeadsPage() {
           </Button>
           <Button icon={<Columns3 size={16} />} onClick={() => setModal("columns")} className="hidden md:inline-flex">Columns</Button>
           <Button icon={<Save size={16} />} onClick={() => setModal("save")} disabled={!hasFilters}>Save view</Button>
+          {me.role === "manager" && <DownloadExcelButton url="/api/leads/export" body={{ filters: { ...filters, search }, sort }} disabled={!total} />}
         </div>
         {activeFilterCount(filters) > 0 && (
           <div className="border-b border-line px-3 py-2.5"><FilterChips value={filters} onChange={(f) => apply(f, null)} /></div>
