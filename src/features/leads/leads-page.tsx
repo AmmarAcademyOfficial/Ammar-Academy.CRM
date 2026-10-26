@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Columns3, Inbox, Plus, Save, Search, SlidersHorizontal, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowRightLeft, ArrowUp, ChevronLeft, ChevronRight, Columns3, Inbox, Plus, Save, Search, SlidersHorizontal, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { StageBadge, TAG_COLORS, NewBadge, ReturningBadge } from "@/components/ui/badges";
 import { Button, IconButton } from "@/components/ui/button";
@@ -19,6 +19,7 @@ import { deleteView, saveView, setColumns } from "@/server/actions";
 import { AddCustomerDialog } from "./add-customer";
 import { COLUMNS, DEFAULT_COLUMNS } from "./columns";
 import { FilterChips, FilterDialog } from "./filters";
+import { idsUrl, MAX_MOVE, MoveAgentLeadsDialog, MoveSelectedDialog } from "./move-leads";
 
 const PAGE_SIZE = 25;
 
@@ -39,7 +40,11 @@ export function LeadsPage() {
   const [viewId, setViewId] = useState<string | null>(null);
   const [sort, setSort] = useState<{ key: LeadSortKey; dir: "asc" | "desc" }>({ key: "created", dir: "desc" });
   const [page, setPage] = useState(0);
-  const [modal, setModal] = useState<null | "filters" | "columns" | "save" | "add">(null);
+  const [modal, setModal] = useState<null | "filters" | "columns" | "save" | "add" | "move" | "move-agent">(null);
+  // Managers pick leads to move: id → current owner (kept across pages, cleared when the filters change).
+  const [picked, setPicked] = useState<Record<string, string | null>>({});
+  const [pickingAll, setPickingAll] = useState(false);
+  const canMove = me.role === "manager";
   const [viewName, setViewName] = useState("");
 
   const search = useDebounced(filters.search, 300);
@@ -56,6 +61,7 @@ export function LeadsPage() {
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const apply = (f: LeadFilters, view: string | null = null) => {
+    setPicked({});
     setFilters(f);
     setViewId(view);
     setPage(0);
@@ -65,13 +71,30 @@ export function LeadsPage() {
     setPage(0);
   };
   const hasFilters = activeFilterCount(filters) > 0 || !!filters.search;
+  const pickedIds = Object.keys(picked);
+  const pageAllPicked = rows.length > 0 && rows.every((r) => r.inquiry.id in picked);
+  const pick = (id: string, owner: string | null, on: boolean) => setPicked((p) => { const n = { ...p }; if (on) n[id] = owner; else delete n[id]; return n; });
+  const pickPage = (on: boolean) => setPicked((p) => { const n = { ...p }; for (const r of rows) { if (on) n[r.inquiry.id] = r.inquiry.salesOwnerId; else delete n[r.inquiry.id]; } return n; });
+  const pickAllMatching = async () => {
+    setPickingAll(true);
+    try {
+      const res = await fetch(idsUrl({ ...filters, search }), { cache: "no-store" });
+      const body = (await res.json()) as { ids: string[]; owners: Record<string, string | null> };
+      if (res.ok) setPicked(Object.fromEntries(body.ids.slice(0, MAX_MOVE).map((id) => [id, body.owners[id] ?? null])));
+    } finally {
+      setPickingAll(false);
+    }
+  };
 
   return (
     <div>
       <PageHeader
         title={me.role === "manager" ? "All leads" : "My leads"}
         subtitle={data ? `${total} ${hasFilters ? "matching " : ""}inquir${total === 1 ? "y" : "ies"}${me.role === "manager" ? "" : " assigned to you"}` : " "}
-        actions={<Button variant="primary" icon={<Plus size={16} />} onClick={() => setModal("add")}>Add customer</Button>}
+        actions={<>
+          {canMove && <Button icon={<ArrowRightLeft size={16} />} onClick={() => setModal("move-agent")}>Move leads</Button>}
+          <Button variant="primary" icon={<Plus size={16} />} onClick={() => setModal("add")}>Add customer</Button>
+        </>}
       />
 
       <div className="scrollbar-thin -mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-1 lg:mx-0 lg:px-0" role="tablist" aria-label="Saved views">
@@ -128,6 +151,20 @@ export function LeadsPage() {
         {activeFilterCount(filters) > 0 && (
           <div className="border-b border-line px-3 py-2.5"><FilterChips value={filters} onChange={(f) => apply(f, null)} /></div>
         )}
+        {canMove && pickedIds.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 border-b border-line bg-navy-50 px-3 py-2 text-sm" role="region" aria-label="Selected leads">
+            <span className="font-medium" data-testid="picked-count">{pickedIds.length} selected</span>
+            {pageAllPicked && total > pickedIds.length && (
+              <button className="font-medium text-navy-700 hover:underline disabled:opacity-50" disabled={pickingAll} onClick={pickAllMatching}>
+                {pickingAll ? "Selecting…" : total > MAX_MOVE ? `Select the first ${MAX_MOVE} of ${total} matching` : `Select all ${total} matching`}
+              </button>
+            )}
+            <div className="ml-auto flex gap-2">
+              <Button size="sm" variant="primary" icon={<ArrowRightLeft size={14} />} onClick={() => setModal("move")}>Move…</Button>
+              <Button size="sm" icon={<X size={14} />} onClick={() => setPicked({})}>Clear</Button>
+            </div>
+          </div>
+        )}
         <p className="sr-only" aria-live="polite">{data ? `${total} results` : ""}</p>
         {error && <p role="alert" className="border-b border-line bg-bad-bg px-4 py-2 text-sm text-bad">{error}</p>}
 
@@ -147,6 +184,11 @@ export function LeadsPage() {
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="border-b border-line text-xs text-muted">
+                    {canMove && (
+                      <th scope="col" className="w-10 pl-4">
+                        <input type="checkbox" aria-label="Select all leads on this page" checked={pageAllPicked} onChange={(e) => pickPage(e.target.checked)} className="h-4 w-4 accent-navy-900" />
+                      </th>
+                    )}
                     {columns.map((c) => (
                       <th key={c.key} scope="col" className="whitespace-nowrap px-3 py-2.5 font-medium first:pl-5" aria-sort={c.sort && sort.key === c.sort ? (sort.dir === "asc" ? "ascending" : "descending") : undefined}>
                         {c.sort ? (
@@ -170,6 +212,11 @@ export function LeadsPage() {
                       className={clsx("cursor-pointer border-b border-line/70 last:border-0", isUnopened(r.inquiry) ? "bg-new-bg hover:bg-new-bg-hover" : "hover:bg-navy-50/60")}
                       style={{ boxShadow: r.primaryTag ? `inset 4px 0 0 ${TAG_COLORS[r.primaryTag.color].dot}` : undefined }}
                     >
+                      {canMove && (
+                        <td className="w-10 pl-4" onClick={(e) => e.stopPropagation()}>
+                          <input type="checkbox" aria-label={`Select ${r.contact.name}`} checked={r.inquiry.id in picked} onChange={(e) => pick(r.inquiry.id, r.inquiry.salesOwnerId, e.target.checked)} className="h-4 w-4 accent-navy-900" />
+                        </td>
+                      )}
                       {columns.map((c, i) => (
                         <td key={c.key} className={clsx("px-3 py-2.5 align-middle", i === 0 && "max-w-[260px] pl-5")}>
                           {i === 0 ? (
@@ -192,8 +239,11 @@ export function LeadsPage() {
                 const f = r.nextFollowUp;
                 const t = f && followUpTiming(f, now);
                 return (
-                  <li key={r.inquiry.id} className={clsx(isUnopened(r.inquiry) && "bg-new-bg")} style={{ boxShadow: r.primaryTag ? `inset 4px 0 0 ${TAG_COLORS[r.primaryTag.color].dot}` : undefined }}>
-                    <button className="flex w-full flex-col gap-1.5 px-4 py-3 text-left" onClick={() => openInquiry(r.inquiry.id)}>
+                  <li key={r.inquiry.id} className={clsx("flex items-start", isUnopened(r.inquiry) && "bg-new-bg")} style={{ boxShadow: r.primaryTag ? `inset 4px 0 0 ${TAG_COLORS[r.primaryTag.color].dot}` : undefined }}>
+                    {canMove && (
+                      <input type="checkbox" aria-label={`Select ${r.contact.name}`} checked={r.inquiry.id in picked} onChange={(e) => pick(r.inquiry.id, r.inquiry.salesOwnerId, e.target.checked)} className="ml-4 mt-4 h-4 w-4 shrink-0 accent-navy-900" />
+                    )}
+                    <button className="flex w-full min-w-0 flex-col gap-1.5 px-4 py-3 text-left" onClick={() => openInquiry(r.inquiry.id)}>
                       <span className="flex w-full items-center justify-between gap-2">
                         <span className="flex min-w-0 items-center gap-1.5">
                           <Name className="truncate font-medium">{r.contact.name}</Name>
@@ -229,6 +279,8 @@ export function LeadsPage() {
       </Card>
 
       {modal === "add" && <AddCustomerDialog onClose={() => setModal(null)} />}
+      {modal === "move" && <MoveSelectedDialog ids={pickedIds} owners={picked} onClose={() => setModal(null)} onDone={() => setPicked({})} />}
+      {modal === "move-agent" && <MoveAgentLeadsDialog onClose={() => setModal(null)} />}
       {modal === "filters" && <FilterDialog value={filters} onClose={() => setModal(null)} onApply={(f) => { apply(f); setModal(null); }} />}
       {modal === "columns" && (
         <ColumnsDialog current={columnKeys} onClose={() => setModal(null)} onSave={async (keys) => (await runAction(setColumns(keys), "Columns saved for you", { reference: true })).ok && setModal(null)} />

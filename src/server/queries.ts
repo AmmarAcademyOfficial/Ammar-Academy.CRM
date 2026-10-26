@@ -185,6 +185,21 @@ export async function listLeads(staff: Staff, q: LeadQuery): Promise<LeadPage> {
   });
 }
 
+/**
+ * The ids of every lead matching the filters (managers, for "select all matching" and the Move
+ * leads dialog). At most 501 are returned so the caller can tell when there are more than 500.
+ */
+export async function leadIdsMatching(staff: Staff, filters: LeadFilters): Promise<{ ids: string[]; total: number; owners: Record<string, string | null> }> {
+  return asUser(staff.id, async (tx) => {
+    const rows = await leadSelect(tx, filterSql(tx, filters), tx`i.created_at asc`, 501, 0);
+    return {
+      ids: rows.map((r) => String(r.id)),
+      total: Number(rows[0]?.total ?? 0),
+      owners: Object.fromEntries(rows.map((r) => [String(r.id), r.sales_owner_id ? String(r.sales_owner_id) : null])),
+    };
+  });
+}
+
 // ── One lead ─────────────────────────────────────────────────────────────
 
 export async function getLeadDetail(staff: Staff, id: string): Promise<LeadDetail | null> {

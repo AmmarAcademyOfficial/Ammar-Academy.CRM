@@ -70,6 +70,10 @@ You are notified when a payment is submitted for review and when a planned payme
 - **Accounting → Teachers → Close month** (after the 25th): checks every session is recorded, then freezes that month's salaries. Sessions in a closed month can no longer change, and bonuses and deductions are locked. **Reopen** (with a reason) if something must be corrected; the reason is kept in the audit history.
 - **Support → Payments due**: overdue and upcoming planned payments for every support agent's customers (filter by agent with the owner filter).
 - **Needs Review**: sheet rows the CRM could not import safely; fix and import, or dismiss with a reason.
+- **Moving leads** (Leads list):
+  - *Picked leads:* tick leads (the box at the top ticks the whole page; then **Select all … matching** takes every lead matching the filters, up to 500). Click **Move…** and choose **Give them to one agent**, **Share across several agents** (handed out in turn, oldest first) or **Return them to the queue**, with a reason.
+  - *One agent's leads:* **Move leads** at the top: choose the agent, optionally a program and created dates (open leads only by default), then give them to one agent, share them, **Swap with another agent** (their matching leads come back the other way) or return them to the queue.
+  - Each move is all or nothing. Open follow-ups move with the lead, the timeline says who moved it and why, each agent gets one notification, and the audit history keeps one line. The dialog shows each receiving agent's open leads and warns when a cap would be passed. Who is credited for a past sale never changes. Enrolled, lost and invalid leads can go to an agent but not back to the queue.
 
 **Weekly**
 - **Reports**: choose the dates, program and course type. Every figure has **How it is counted**. **Download CSV** for a spreadsheet.
