@@ -258,8 +258,10 @@ with sync_playwright() as p:
     expect(m.get_by_text("1 handed-over customer flagged after a reversal")).to_be_visible()
     shot(m, "08-payments-flagged")
     m.goto(f"{BASE}/customers")
-    m.get_by_label("Flagged for review only").check()
-    expect(m.get_by_role("listitem").filter(has_text="Sara Nasser")).to_be_visible()
+    m.get_by_role("button", name="Filters").click()
+    m.get_by_role("dialog", name="Filter customers").get_by_label("Flagged for review").check()
+    m.get_by_role("dialog", name="Filter customers").get_by_role("button", name="Show customers").click()
+    expect(m.locator("tbody tr[data-customer='Sara Nasser']")).to_be_visible()
     check("Flagged customer listed on the Support page", True)
     shot(m, "09-support-flagged")
 

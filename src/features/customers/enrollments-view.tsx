@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Search, SlidersHorizontal, Users, X } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Download, Search, SlidersHorizontal, Users, X } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Pill, SupportStatusBadge } from "@/components/ui/badges";
 import { Button, IconButton } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import type { EnrollmentFilters, EnrollmentList, EnrollmentListRow, EnrollmentSo
 import { cairoParts, formatMoney } from "@/domain/rules";
 import { formatDay } from "@/features/leads/filters";
 import { CourseTypeChip } from "@/features/settings/courses-settings";
+import { toCsv } from "@/lib/csv";
 import { profileName } from "@/lib/lead-row";
 import { useApi, useWorkspace } from "@/lib/workspace";
 
@@ -91,6 +92,37 @@ export function EnrollmentsView() {
   const today = cairoParts(now).date;
   const course = (id: string) => ref.courses.find((c) => c.id === id);
   const showPhone = me.role !== "accountant";
+  const canDownload = me.role === "manager" || me.role === "accountant";
+  const [downloading, setDownloading] = useState(false);
+  /** Every matching customer as CSV (pages of 100), in the list's order. Phones only for managers. */
+  const downloadCsv = async () => {
+    setDownloading(true);
+    try {
+      const all: EnrollmentListRow[] = [];
+      for (let pg = 0; pg < 200; pg++) {
+        const body = { ...q, page: pg, pageSize: 100 };
+        const res = await fetch(`/api/enrollments?q=${encodeURIComponent(JSON.stringify(body))}`, { cache: "no-store" });
+        if (!res.ok) return;
+        const part = (await res.json()) as EnrollmentList;
+        all.push(...part.rows);
+        if (all.length >= part.total || part.rows.length === 0) break;
+      }
+      const rows: unknown[][] = [["Customer", ...(showPhone ? ["Phone"] : []), "Student", "Program", "Course", "Course starts", "Enrolled on", "Sales agent", "Support owner", "Status",
+        "Currency", "Agreed total", "Paid", "Waiting for review", "Balance", "Last payment", "Next due date", "Next due amount", "Overdue", "Teacher"]];
+      for (const r of all) rows.push([r.customerName, ...(showPhone ? [r.phone ?? ""] : []), r.studentName ?? "", ref.programs.find((x) => x.id === r.programId)?.name ?? "",
+        course(r.courseId)?.name ?? "", r.courseStart ?? "", r.enrolledAt.slice(0, 10), r.salesAgentId ? profileName(ref, r.salesAgentId) : "",
+        r.supportOwnerId ? profileName(ref, r.supportOwnerId) : "", STATUS_LABEL[r.status], r.currency, r.agreed, r.paid, r.pending, r.balance,
+        r.lastPaidOn ?? "", r.nextDueOn ?? "", r.nextDueLeft ?? "", r.overdueLeft, r.teacherNames ?? ""]);
+      const url = URL.createObjectURL(new Blob([toCsv(rows)], { type: "text/csv;charset=utf-8" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `customers-${today}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setDownloading(false);
+    }
+  };
   const sp = { sort, onSort: toggleSort };
 
 
@@ -127,6 +159,7 @@ export function EnrollmentsView() {
             </div>
           )}
           <Button icon={<SlidersHorizontal size={16} />} onClick={() => setDialog(true)}>Filters{count ? ` · ${count}` : ""}</Button>
+          {canDownload && <Button icon={<Download size={16} />} disabled={!data?.total || downloading} onClick={downloadCsv}>{downloading ? "Preparing…" : "Download CSV"}</Button>}
         </div>
         {(count > 0 || filters.search) && (
           <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2.5 text-sm">
@@ -148,14 +181,14 @@ export function EnrollmentsView() {
               <table className="w-full text-left text-sm" aria-label="Customers">
                 <thead>
                   <tr className="border-b border-line text-xs text-muted">
-                    <Th k="customer" {...sp}>Customer</Th><Th k="course" {...sp}>Course</Th><Th k="enrolled" {...sp}>Enrolled</Th><Th k="sales" {...sp}>Sales</Th><Th k="support" {...sp}>Support</Th>
-                    <Th {...sp}>Status</Th><Th k="paid" right {...sp}>Paid</Th><Th k="balance" right {...sp}>Balance</Th><Th k="next_due" {...sp}>Next due</Th><Th {...sp}>Teacher</Th>
+                    <Th k="customer" {...sp}>Customer</Th><Th k="course" {...sp}>Course</Th><Th k="enrolled" {...sp}>Enrolled</Th><Th k="sales" {...sp}>Sales · support</Th>
+                    <Th {...sp}>Status</Th><Th k="paid" right {...sp}>Paid</Th><Th k="balance" right {...sp}>Balance</Th><Th k="next_due" {...sp}>Next due</Th>
                   </tr>
                 </thead>
                 <tbody>
                   {data.rows.map((r) => (
                     <tr key={r.enrollmentId} className="cursor-pointer border-b border-line/70 last:border-0 hover:bg-navy-50/60" onClick={() => openInquiry(r.inquiryId)} data-customer={r.customerName}>
-                      <td className="max-w-[240px] px-3 py-2.5 pl-5">
+                      <td className="max-w-[200px] px-3 py-2.5 pl-5">
                         <button className="block w-full text-left" onClick={(e) => { e.stopPropagation(); openInquiry(r.inquiryId); }}>
                           <Name className="block truncate font-medium">{r.customerName}</Name>
                           <span className="block truncate text-xs text-muted">{r.studentName && r.studentName !== r.customerName ? `Student: ${r.studentName}` : ""}{r.phone && <PhoneText value={r.phone} className={r.studentName && r.studentName !== r.customerName ? "ml-2" : ""} />}</span>
@@ -163,24 +196,25 @@ export function EnrollmentsView() {
                       </td>
                       <td className="max-w-[220px] px-3 py-2.5">
                         <span className="block truncate">{course(r.courseId)?.name ?? "—"}</span>
-                        <span className="flex items-center gap-1.5 text-xs text-muted"><CourseTypeChip type={ref.courseTypes.find((t) => t.id === r.courseTypeId)} />{r.courseStart && `starts ${formatDay(r.courseStart)}`}</span>
+                        <span className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted"><CourseTypeChip type={ref.courseTypes.find((t) => t.id === r.courseTypeId)} />{r.courseStart && <span className="whitespace-nowrap">starts {formatDay(r.courseStart)}</span>}</span>
+                        {(r.teacherNames || r.packageHours !== null) && (
+                          <span className="block truncate text-xs text-muted">{r.teacherNames ? `Teacher: ${r.teacherNames}` : ""}{r.packageHours !== null ? `${r.teacherNames ? " · " : ""}${r.packageUsed ?? 0} of ${r.packageHours} h used` : ""}</span>
+                        )}
                       </td>
                       <td className="whitespace-nowrap px-3 py-2.5 tabular-nums">{formatDay(r.enrolledAt.slice(0, 10))}</td>
-                      <td className="whitespace-nowrap px-3 py-2.5">{r.salesAgentId ? profileName(ref, r.salesAgentId) : <span className="text-muted">—</span>}</td>
-                      <td className="whitespace-nowrap px-3 py-2.5">{r.supportOwnerId ? profileName(ref, r.supportOwnerId) : <span className="text-muted">{r.status === "not_handed_over" ? "—" : "Unclaimed"}</span>}</td>
+                      <td className="max-w-[150px] px-3 py-2.5 text-xs">
+                        <span className="block truncate">{r.salesAgentId ? profileName(ref, r.salesAgentId) : <span className="text-muted">No sales agent</span>}</span>
+                        <span className="block truncate text-muted">{r.supportOwnerId ? profileName(ref, r.supportOwnerId) : r.status === "not_handed_over" ? "Not with support yet" : "Unclaimed"}</span>
+                      </td>
                       <td className="px-3 py-2.5"><StatusCell s={r.status} /></td>
                       <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums">{formatMoney(r.paid, r.currency)}<span className="block text-xs text-muted">of {formatMoney(r.agreed, r.currency)}</span></td>
                       <td className={clsx("whitespace-nowrap px-3 py-2.5 text-right font-medium tabular-nums", r.balance === 0 && "text-ok")}>
                         {r.balance === 0 ? "Paid" : formatMoney(r.balance, r.currency)}
                         {r.pending > 0 && <span className="block text-xs font-normal text-warn">{formatMoney(r.pending, r.currency)} to review</span>}
                       </td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-xs">
-                        {r.overdueLeft > 0 ? <span className="font-medium text-bad">{formatMoney(r.overdueLeft, r.currency)} overdue</span>
+                      <td className="whitespace-nowrap px-3 py-2.5 pr-5 text-xs">
+                        {r.overdueLeft > 0 ? <span className="font-medium text-bad">{formatMoney(r.overdueLeft, r.currency)}<span className="block font-normal">overdue</span></span>
                           : r.nextDueOn ? <>{formatMoney(r.nextDueLeft ?? 0, r.currency)}<span className="block text-muted">{r.nextDueOn < today ? "was due" : "due"} {formatDay(r.nextDueOn)}</span></> : <span className="text-muted">—</span>}
-                      </td>
-                      <td className="max-w-[160px] px-3 py-2.5 text-xs">
-                        <span className="block truncate">{r.teacherNames ?? <span className="text-muted">—</span>}</span>
-                        {r.packageHours !== null && <span className="text-muted">{r.packageUsed ?? 0} of {r.packageHours} h used</span>}
                       </td>
                     </tr>
                   ))}
@@ -230,7 +264,7 @@ function MobileRow({ r, onOpen }: { r: EnrollmentListRow; onOpen: () => void }) 
         <span className="truncate text-xs text-muted">{ref.courses.find((c) => c.id === r.courseId)?.name ?? "—"} · enrolled {formatDay(r.enrolledAt.slice(0, 10))}</span>
         <span className="flex flex-wrap gap-x-3 text-xs">
           <span>Paid {formatMoney(r.paid, r.currency)} of {formatMoney(r.agreed, r.currency)}</span>
-          {r.overdueLeft > 0 ? <span className="font-medium text-bad">{formatMoney(r.overdueLeft, r.currency)} overdue</span> : r.balance === 0 ? <span className="text-ok">Fully paid</span> : null}
+          {r.overdueLeft > 0 ? <span className="font-medium text-bad">{formatMoney(r.overdueLeft, r.currency)}<span className="block font-normal">overdue</span></span> : r.balance === 0 ? <span className="text-ok">Fully paid</span> : null}
         </span>
       </button>
     </li>

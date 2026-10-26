@@ -129,11 +129,13 @@ with sync_playwright() as p:
 
     # ── 3. Customers tab ────────────────────────────────────────────────────
     m.get_by_role("tab", name="Customers").click()
-    m.get_by_label("Show").select_option("overdue")
-    crow = m.get_by_role("table", name="Customer balances").locator("tbody tr")
+    m.get_by_role("button", name="Filters").click()
+    m.get_by_role("dialog", name="Filter customers").get_by_label("Overdue").check()
+    m.get_by_role("dialog", name="Filter customers").get_by_role("button", name="Show customers").click()
+    crow = m.get_by_role("table", name="Customers").locator("tbody tr")
     expect(crow).to_have_count(1)
-    expect(crow.first).to_contain_text("Jana Ezzat")
-    expect(crow.first.locator("[data-balance]")).to_have_text("10,500 EGP")
+    expect(crow.first).to_have_attribute("data-customer", "Jana Ezzat")
+    expect(crow.first).to_contain_text("10,500 EGP")
     check("Customers: balance left and the overdue filter", True)
     shot(m, "02-customers")
     crow.first.click()

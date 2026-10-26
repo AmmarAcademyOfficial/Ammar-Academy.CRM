@@ -129,6 +129,11 @@ with sync_playwright() as p:
     expect(arows).to_have_count(min(ALL, 50))
     phones = a.get_by_role("table", name="Customers").locator("text=/\\+20/").count()
     check("Accounting → Customers is the same list, without phone numbers", phones == 0)
+    with a.expect_download() as dl:
+        a.get_by_role("button", name="Download CSV").click()
+    text = Path(dl.value.path()).read_text(encoding="utf-8-sig")
+    check("The accountant downloads every matching customer as CSV, without phones",
+          text.count("\n") == ALL and "Phone" not in text.splitlines()[0] and "+20" not in text, f"{text.count(chr(10))} rows")
 
     # ── 4. Sales cannot; phone layout ───────────────────────────────────────
     sctx = browser.new_context(viewport={"width": 1440, "height": 900})
