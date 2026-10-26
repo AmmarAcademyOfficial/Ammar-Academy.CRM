@@ -1,12 +1,12 @@
 "use client";
 
+import { EnrollmentsView } from "@/features/customers/enrollments-view";
 import { isUnopenedCustomer } from "@/lib/lead-row";
-import { AlertTriangle, Banknote, CalendarClock, CheckCircle2, Hand, Inbox, ListChecks, Search, Users } from "lucide-react";
+import { AlertTriangle, Banknote, CalendarClock, CheckCircle2, Hand, Inbox, ListChecks, Users } from "lucide-react";
 import { useState } from "react";
 import { DueBadge, SupportStatusBadge, NewBadge } from "@/components/ui/badges";
 import { Button } from "@/components/ui/button";
 import { cn as clsx } from "@/components/ui/cn";
-import { Checkbox, Input, Select } from "@/components/ui/form";
 import { Card, CardHeader, EmptyState, Name, PageHeader, PhoneText, SkeletonRows, Stat } from "@/components/ui/misc";
 import type { CustomerRow, PaymentDueRow, SupportWork } from "@/domain/dto";
 import { cairoParts, formatCairo, formatMoney, formatRelative } from "@/domain/rules";
@@ -134,47 +134,14 @@ function DueLine({ inquiryId, name, label, dueAt, icon, action }: { inquiryId: s
   );
 }
 
-/** Customers (support) / Support (managers): every handed-over customer, filterable. */
+/** Customers (support) / Support (managers): every enrolled customer, with filters that combine (Part B). */
 export function CustomersPage() {
-  const { me, ref } = useWorkspace();
-  const [status, setStatus] = useState("any");
-  const [owner, setOwner] = useState(me.role === "support" ? "mine" : "any");
-  const [flagged, setFlagged] = useState(false);
-  const [search, setSearch] = useState("");
-  const qs = new URLSearchParams({ status, owner, q: search, ...(flagged ? { flagged: "1" } : {}) });
-  const { data, loading } = useApi<CustomerRow[]>(`/api/customers?${qs}`);
-  const supportStaff = ref.profiles.filter((p) => p.role === "support");
+  const { me } = useWorkspace();
   return (
     <div>
-      <PageHeader title={me.role === "manager" ? "Support" : "Customers"} subtitle="Enrolled customers handed over to support after a confirmed payment." />
-      <Card className="mb-4 grid gap-2 p-3 sm:grid-cols-4">
-        <label className="relative">
-          <span className="sr-only">Search customers</span>
-          <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" aria-hidden />
-          <Input className="h-9 pl-8" placeholder="Name, student or phone" value={search} onChange={(e) => setSearch(e.target.value)} />
-        </label>
-        <Select aria-label="Status" className="h-9" value={status} onChange={(e) => setStatus(e.target.value)}>
-          <option value="any">Any status</option><option value="new_customer">New Customer</option><option value="onboarding">Onboarding</option><option value="active">Active</option>
-        </Select>
-        <Select aria-label="Support owner" className="h-9" value={owner} onChange={(e) => setOwner(e.target.value)}>
-          <option value="any">{me.role === "support" ? "Queue and mine" : "Anyone"}</option>
-          <option value="unclaimed">Waiting in the queue</option>
-          {me.role === "support" ? <option value="mine">Mine</option> : supportStaff.map((p) => <option key={p.id} value={p.id}>{p.fullName}</option>)}
-        </Select>
-        <div className="flex items-center px-1"><Checkbox label="Flagged for review only" checked={flagged} onChange={setFlagged} /></div>
-      </Card>
-      {me.role === "manager" && <PaymentsDueCard owner={owner === "unclaimed" || owner === "mine" ? "any" : owner} className="mb-4" />}
-      <Card>
-        {!data && loading ? <SkeletonRows rows={4} /> : data?.length === 0 ? (
-          <EmptyState icon={<Users size={22} />} title="No customers match">Customers appear here when a manager confirms a qualifying payment.</EmptyState>
-        ) : (
-          <ul className={clsx("divide-y divide-line")}>
-            {data?.map((c) => (
-              <CustomerLine key={c.onboarding.id} c={c} action={me.role === "manager" ? <span className="text-xs text-muted">{c.onboarding.supportOwnerId ? profileName(ref, c.onboarding.supportOwnerId) : "Unclaimed"}</span> : undefined} />
-            ))}
-          </ul>
-        )}
-      </Card>
+      <PageHeader title={me.role === "manager" ? "Support" : "Customers"} subtitle="Every enrolled customer. Filter by course, dates, status, payments and owners; every filter you set must match." />
+      {me.role === "manager" && <PaymentsDueCard owner="any" className="mb-4" />}
+      <EnrollmentsView />
     </div>
   );
 }

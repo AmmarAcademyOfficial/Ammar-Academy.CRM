@@ -115,11 +115,14 @@ describe("who sees what", () => {
     expect((await list(manager, { search: phone.slice(-6) })).total).toBe(1);
   });
 
-  it("support sees their own customers by default, every customer with 'all'", async () => {
+  it("support sees their own customers and the unclaimed queue by default, every customer with 'all'", async () => {
     const mine = await list(sup1);
     expect([mine.scope, names(mine)]).toEqual(["mine", ["Enrl Flagged", "Enrl Paid"]]);
     expect(names(await list(sup2))).toEqual(["Enrl Overdue"]);
     expect((await list(sup2, {}, { scope: "all" })).total).toBe(4);
+    await admin("update public.onboardings set support_owner_id = null where enrollment_id = $1", [c.Overdue.enrollment]);
+    expect(names(await list(sup1))).toEqual(["Enrl Flagged", "Enrl Overdue", "Enrl Paid"]); // waiting to be claimed
+    await admin("update public.onboardings set support_owner_id = $2 where enrollment_id = $1", [c.Overdue.enrollment, sup2.id]);
   });
 
   it("sales agents cannot use it", async () => {

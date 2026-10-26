@@ -2,7 +2,7 @@
 -- The Enrollments list: every enrolled customer (one row per enrollment) with filters that combine,
 -- sorting, paging and totals per currency, for managers, accountants and support.
 --   * Managers and accountants see every enrollment; accountants get no phone numbers.
---   * Support sees their own customers by default, or every customer with scope 'all' (to cover for a colleague).
+--   * Support sees their own customers and the unclaimed queue by default, or every customer with scope 'all'.
 --   * Sales agents cannot use it.
 -- Read-only and additive: one new function; nothing existing changes.
 
@@ -79,7 +79,8 @@ begin
   ),
   hit as (
     select * from base b
-     where (v_role <> 'support' or v_scope = 'all' or b.support_owner_id = v_me)
+     where (v_role <> 'support' or v_scope = 'all' or b.support_owner_id = v_me
+            or (b.support_owner_id is null and b.status <> 'not_handed_over'))  -- 'mine' = mine + the unclaimed queue, as before
        and (v_search is null or b.customer_name ilike '%' || replace(replace(v_search, '%', '\%'), '_', '\_') || '%'
             or coalesce(b.student_name, '') ilike '%' || replace(replace(v_search, '%', '\%'), '_', '\_') || '%'
             or (v_role <> 'accountant' and v_digits is not null and length(v_digits) >= 3

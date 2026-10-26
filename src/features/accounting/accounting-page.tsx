@@ -3,7 +3,7 @@
 import { AlertTriangle, Banknote, Clock, Download, Paperclip, Receipt, Search, Wallet } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
-import { DueBadge, SubmissionBadge } from "@/components/ui/badges";
+import { SubmissionBadge } from "@/components/ui/badges";
 import { Button } from "@/components/ui/button";
 import { cn as clsx } from "@/components/ui/cn";
 import { Input, Select } from "@/components/ui/form";
@@ -11,16 +11,16 @@ import { Card, CardHeader, EmptyState, Name, PageHeader, SkeletonRows, Stat } fr
 import { Dialog } from "@/components/ui/overlay";
 import { academyMonth, daysBetween, periodRange, PERIODS, shiftDay, sumByCurrency, type Period } from "@/domain/accounting";
 import type { AccountingCustomer, AccountingData, AccountingPayment, MoneyTotal } from "@/domain/dto";
-import { cairoParts, formatCairo, formatMoney } from "@/domain/rules";
+import { cairoParts, formatMoney } from "@/domain/rules";
 import type { PaymentMethod, SubmissionStatus } from "@/domain/types";
 import { SubmissionItem } from "@/features/lead-panel/payments-tab";
 import { formatDay } from "@/features/leads/filters";
-import { CourseTypeChip } from "@/features/settings/courses-settings";
 import { KIND_LABEL, METHOD_LABEL, courseOf } from "@/lib/courses";
 import { toCsv } from "@/lib/csv";
 import { profileName } from "@/lib/lead-row";
 import { useApi, useWorkspace } from "@/lib/workspace";
 import { TeachersView } from "./teachers-view";
+import { EnrollmentsView } from "@/features/customers/enrollments-view";
 
 type Tab = "overview" | "payments" | "customers" | "agents" | "teachers";
 const TABS: { id: Tab; label: string }[] = [
@@ -64,7 +64,7 @@ export function AccountingPage() {
   const [f, setF] = useState<Filters>(NO_FILTERS);
   const range = periodRange(period, today, custom);
   const valid = !!range.from && !!range.to && range.from <= range.to;
-  const teachersTab = tab === "teachers";
+  const teachersTab = tab === "teachers" || tab === "customers";  // these tabs bring their own filters
   const { data, loading, error } = useApi<AccountingData>(valid && !teachersTab ? `/api/accounting?from=${range.from}&to=${range.to}` : null);
 
   const salesStaff = ref.profiles.filter((p) => p.role === "sales" || (p.role === "manager" && data?.customers.some((c) => c.salesAgentId === p.id)));
@@ -84,7 +84,7 @@ export function AccountingPage() {
 
   return (
     <div>
-      <PageHeader title="Accounting" subtitle={teachersTab ? "Teacher salaries per Academy month (26th to 25th), from the session hours support records. Currencies are never added together." : "Confirmed payments by the date the customer paid. Amounts in different currencies are never added together."} />
+      <PageHeader title="Accounting" subtitle={tab === "customers" ? "Every enrolled customer: agreed total, paid, balance and planned payments. Filters combine; currencies are never added together." : teachersTab ? "Teacher salaries per Academy month (26th to 25th), from the session hours support records. Currencies are never added together." : "Confirmed payments by the date the customer paid. Amounts in different currencies are never added together."} />
 
       {!teachersTab && <Card className="mb-4 p-3">
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 [&>*]:min-w-0">
@@ -142,13 +142,14 @@ export function AccountingPage() {
         ))}
       </div>
 
-      {teachersTab && <TeachersView />}
+      {tab === "teachers" && <TeachersView />}
+      {tab === "customers" && <EnrollmentsView />}
       {!teachersTab && !valid && <Card className="p-4 text-sm text-bad">Choose a start date before the end date.</Card>}
       {!teachersTab && error && <Card className="p-4 text-sm text-bad">{error}</Card>}
       {!teachersTab && valid && !data && loading && <Card><SkeletonRows rows={5} /></Card>}
       {data && tab === "overview" && <Overview payments={payments} customers={customers} range={range} />}
       {data && tab === "payments" && <PaymentsView payments={payments} range={range} />}
-      {data && tab === "customers" && <CustomersView customers={customers} />}
+      
       {data && tab === "agents" && <AgentsView payments={payments} customers={customers} range={range} />}
     </div>
   );
@@ -377,90 +378,6 @@ function PaymentsView({ payments, range }: { payments: AccountingPayment[]; rang
   );
 }
 
-// ── Customers ────────────────────────────────────────────────────────────
-
-type BalanceFilter = "all" | "owing" | "overdue" | "paid";
-
-function CustomersView({ customers }: { customers: AccountingCustomer[] }) {
-  const { ref, me, openInquiry } = useWorkspace();
-  const [show, setShow] = useState<BalanceFilter>("owing");
-  const [sort, setSort] = useState<"overdue" | "balance" | "name" | "next">("overdue");
-  const [q, setQ] = useState("");
-  const needle = q.trim().toLowerCase();
-  const rows = customers
-    .filter((c) => (show === "all" || (show === "owing" && c.balance > 0) || (show === "overdue" && c.overdueLeft > 0) || (show === "paid" && c.balance <= 0)))
-    .filter((c) => !needle || c.customerName.toLowerCase().includes(needle) || (c.studentName ?? "").toLowerCase().includes(needle))
-    .sort((a, b) =>
-      sort === "name" ? a.customerName.localeCompare(b.customerName)
-      : sort === "balance" ? b.balance - a.balance
-      : sort === "next" ? (a.nextDue?.dueOn ?? "9999").localeCompare(b.nextDue?.dueOn ?? "9999")
-      : (b.overdueLeft - a.overdueLeft) || (b.balance - a.balance));
-  const clickable = me.role === "manager";
-  const owed = sumByCurrency(rows.map((c) => ({ amount: c.balance, currency: c.currency })));
-
-  const exportCsv = () => download(`customer-balances-${cairoParts(new Date()).date}.csv`, [
-    ["Customer", "Student", "Program", "Course", "Agreed total", "Confirmed paid", "Waiting for review", "Balance left", "Currency", "Next payment date", "Next payment amount", "Next payment status", "Overdue amount", "Overdue since", "Sales agent", "Support agent", "Enrolled on"],
-    ...rows.map((c) => [
-      c.customerName, c.studentName ?? "", ref.programs.find((x) => x.id === c.programId)?.code ?? "", courseOf(ref, c.courseId)?.name ?? "",
-      c.agreed, c.paid, c.pending, c.balance, c.currency, c.nextDue?.dueOn ?? "", c.nextDue?.left ?? "", c.nextDue?.status ?? "", c.overdueLeft, c.overdueSince ?? "",
-      c.salesAgentId ? profileName(ref, c.salesAgentId) : "", c.supportOwnerId ? profileName(ref, c.supportOwnerId) : "", c.enrolledAt.slice(0, 10),
-    ]),
-  ]);
-
-  return (
-    <Card>
-      <CardHeader title="Customer balances" count={rows.length} subtitle={`As of today · ${moneyList(owed)} still owed by these customers`}
-        action={<Button size="sm" icon={<Download size={14} />} onClick={exportCsv} disabled={!rows.length}>Download CSV</Button>} />
-      <div className="grid gap-2 border-b border-line p-3 sm:grid-cols-3">
-        <label className="relative">
-          <span className="sr-only">Search customers</span>
-          <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" aria-hidden />
-          <Input className="h-9 pl-8" placeholder="Customer or student" value={q} onChange={(e) => setQ(e.target.value)} />
-        </label>
-        <Select aria-label="Show" className="h-9" value={show} onChange={(e) => setShow(e.target.value as BalanceFilter)}>
-          <option value="owing">With a balance left</option><option value="overdue">With an overdue payment</option><option value="paid">Fully paid</option><option value="all">All customers</option>
-        </Select>
-        <Select aria-label="Sort by" className="h-9" value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
-          <option value="overdue">Most overdue first</option><option value="balance">Largest balance first</option><option value="next">Next payment date</option><option value="name">Name</option>
-        </Select>
-      </div>
-      {rows.length === 0 ? (
-        <EmptyState icon={<Wallet size={20} />} title="No customers match">Customers appear here once an enrollment is started.</EmptyState>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[960px] text-sm" aria-label="Customer balances">
-            <thead>
-              <tr className="text-left text-xs text-muted">
-                <th className="px-4 py-2 font-medium">Customer</th><th className="px-4 py-2 font-medium">Course</th><th className="px-4 py-2 text-right font-medium">Agreed</th>
-                <th className="px-4 py-2 text-right font-medium">Paid</th><th className="px-4 py-2 text-right font-medium">Balance left</th><th className="px-4 py-2 font-medium">Next payment</th>
-                <th className="px-4 py-2 text-right font-medium">Overdue</th><th className="px-4 py-2 font-medium">Sales agent</th><th className="px-4 py-2 font-medium">Support</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line">
-              {rows.map((c) => {
-                const course = courseOf(ref, c.courseId);
-                const type = c.courseTypeId ? ref.courseTypes.find((t) => t.id === c.courseTypeId) : undefined;
-                return (
-                  <tr key={c.enrollmentId} className={clsx(clickable && "cursor-pointer hover:bg-navy-50/60")} onClick={clickable ? () => openInquiry(c.inquiryId) : undefined} data-customer={c.customerName}>
-                    <td className="px-4 py-2"><Name className="font-medium">{c.customerName}</Name>{c.studentName && <span className="block text-xs text-muted">Student: {c.studentName}</span>}</td>
-                    <td className="px-4 py-2"><span className="block">{course?.name ?? "—"}</span>{type && <CourseTypeChip type={type} />}</td>
-                    <td className="whitespace-nowrap px-4 py-2 text-right tabular-nums">{formatMoney(c.agreed, c.currency)}</td>
-                    <td className="whitespace-nowrap px-4 py-2 text-right tabular-nums">{formatMoney(c.paid, c.currency)}{c.pending > 0 && <span className="block text-xs text-warn">+{formatMoney(c.pending, c.currency)} in review</span>}</td>
-                    <td className="whitespace-nowrap px-4 py-2 text-right font-semibold tabular-nums" data-balance>{formatMoney(c.balance, c.currency)}</td>
-                    <td className="px-4 py-2">{c.nextDue ? <span className="flex flex-wrap items-center gap-1.5 whitespace-nowrap">{formatCairo(c.nextDue.dueOn, "date")} · {formatMoney(c.nextDue.left, c.currency)} <DueBadge status={c.nextDue.status} /></span> : <span className="text-muted">—</span>}</td>
-                    <td className="whitespace-nowrap px-4 py-2 text-right tabular-nums">{c.overdueLeft > 0 ? <span className="font-medium text-bad">{formatMoney(c.overdueLeft, c.currency)}</span> : <span className="text-muted">—</span>}</td>
-                    <td className="px-4 py-2">{c.salesAgentId ? profileName(ref, c.salesAgentId) : "—"}</td>
-                    <td className="px-4 py-2 text-muted">{c.supportOwnerId ? profileName(ref, c.supportOwnerId) : c.handedOverAt ? "Waiting" : "Not handed over"}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </Card>
-  );
-}
 
 // ── Sales agents ─────────────────────────────────────────────────────────
 
