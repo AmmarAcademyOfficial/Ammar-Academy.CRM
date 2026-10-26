@@ -497,6 +497,14 @@ export interface EnrollmentListRow {
   teacherNames: string | null;
   packageHours: number | null;
   packageUsed: number | null;
+  /** Added in Part C (display names for downloads). */
+  enrolledOn?: string;
+  addedAsExisting?: boolean;
+  programName?: string | null;
+  courseName?: string | null;
+  courseTypeName?: string | null;
+  salesAgentName?: string | null;
+  supportOwnerName?: string | null;
 }
 export interface EnrollmentList {
   total: number;

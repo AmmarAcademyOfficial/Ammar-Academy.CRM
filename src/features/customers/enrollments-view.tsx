@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Download, Search, SlidersHorizontal, Users, X } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Search, SlidersHorizontal, Users, X } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Pill, SupportStatusBadge } from "@/components/ui/badges";
 import { Button, IconButton } from "@/components/ui/button";
@@ -12,8 +12,8 @@ import type { EnrollmentFilters, EnrollmentList, EnrollmentListRow, EnrollmentSo
 import { cairoParts, formatMoney } from "@/domain/rules";
 import { formatDay } from "@/features/leads/filters";
 import { CourseTypeChip } from "@/features/settings/courses-settings";
-import { toCsv } from "@/lib/csv";
 import { profileName } from "@/lib/lead-row";
+import { DownloadExcelButton } from "@/lib/download-excel";
 import { useApi, useWorkspace } from "@/lib/workspace";
 
 export const EMPTY_ENROLLMENT_FILTERS: EnrollmentFilters = {
@@ -93,36 +93,6 @@ export function EnrollmentsView() {
   const course = (id: string) => ref.courses.find((c) => c.id === id);
   const showPhone = me.role !== "accountant";
   const canDownload = me.role === "manager" || me.role === "accountant";
-  const [downloading, setDownloading] = useState(false);
-  /** Every matching customer as CSV (pages of 100), in the list's order. Phones only for managers. */
-  const downloadCsv = async () => {
-    setDownloading(true);
-    try {
-      const all: EnrollmentListRow[] = [];
-      for (let pg = 0; pg < 200; pg++) {
-        const body = { ...q, page: pg, pageSize: 100 };
-        const res = await fetch(`/api/enrollments?q=${encodeURIComponent(JSON.stringify(body))}`, { cache: "no-store" });
-        if (!res.ok) return;
-        const part = (await res.json()) as EnrollmentList;
-        all.push(...part.rows);
-        if (all.length >= part.total || part.rows.length === 0) break;
-      }
-      const rows: unknown[][] = [["Customer", ...(showPhone ? ["Phone"] : []), "Student", "Program", "Course", "Course starts", "Enrolled on", "Sales agent", "Support owner", "Status",
-        "Currency", "Agreed total", "Paid", "Waiting for review", "Balance", "Last payment", "Next due date", "Next due amount", "Overdue", "Teacher"]];
-      for (const r of all) rows.push([r.customerName, ...(showPhone ? [r.phone ?? ""] : []), r.studentName ?? "", ref.programs.find((x) => x.id === r.programId)?.name ?? "",
-        course(r.courseId)?.name ?? "", r.courseStart ?? "", r.enrolledAt.slice(0, 10), r.salesAgentId ? profileName(ref, r.salesAgentId) : "",
-        r.supportOwnerId ? profileName(ref, r.supportOwnerId) : "", STATUS_LABEL[r.status], r.currency, r.agreed, r.paid, r.pending, r.balance,
-        r.lastPaidOn ?? "", r.nextDueOn ?? "", r.nextDueLeft ?? "", r.overdueLeft, r.teacherNames ?? ""]);
-      const url = URL.createObjectURL(new Blob([toCsv(rows)], { type: "text/csv;charset=utf-8" }));
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `customers-${today}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } finally {
-      setDownloading(false);
-    }
-  };
   const sp = { sort, onSort: toggleSort };
 
 
@@ -159,7 +129,7 @@ export function EnrollmentsView() {
             </div>
           )}
           <Button icon={<SlidersHorizontal size={16} />} onClick={() => setDialog(true)}>Filters{count ? ` · ${count}` : ""}</Button>
-          {canDownload && <Button icon={<Download size={16} />} disabled={!data?.total || downloading} onClick={downloadCsv}>{downloading ? "Preparing…" : "Download CSV"}</Button>}
+          {canDownload && <DownloadExcelButton url="/api/enrollments/export" body={{ filters: { ...filters, search }, sort }} disabled={!data?.total} />}
         </div>
         {(count > 0 || filters.search) && (
           <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2.5 text-sm">

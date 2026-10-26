@@ -9,8 +9,10 @@ Runs against the production build and a freshly seeded local database:
 import json
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
+import openpyxl
 from playwright.sync_api import expect, sync_playwright
 import hydration  # noqa: F401  (waits for the page to be interactive after each load)
 
@@ -130,10 +132,16 @@ with sync_playwright() as p:
     phones = a.get_by_role("table", name="Customers").locator("text=/\\+20/").count()
     check("Accounting → Customers is the same list, without phone numbers", phones == 0)
     with a.expect_download() as dl:
-        a.get_by_role("button", name="Download CSV").click()
-    text = Path(dl.value.path()).read_text(encoding="utf-8-sig")
-    check("The accountant downloads every matching customer as CSV, without phones",
-          text.count("\n") == ALL and "Phone" not in text.splitlines()[0] and "+20" not in text, f"{text.count(chr(10))} rows")
+        a.get_by_role("button", name="Download Excel").click()
+    xlsx = Path(tempfile.mkdtemp()) / dl.value.suggested_filename  # openpyxl needs the .xlsx name
+    dl.value.save_as(xlsx)
+    wb = openpyxl.load_workbook(xlsx)
+    ws = wb["Enrollments"]
+    headers = [c.value for c in ws[1]]
+    values = [str(c.value) for row in ws.iter_rows() for c in row if c.value is not None]
+    data_rows = [r for r in ws.iter_rows(min_row=2, values_only=True) if r[0] and not str(r[0]).startswith("Total ")]
+    check("The accountant downloads every matching customer as Excel, without phones",
+          len(data_rows) == ALL and "Phone" not in headers and not any("+20" in v for v in values), f"{len(data_rows)} rows")
 
     # ── 4. Sales cannot; phone layout ───────────────────────────────────────
     sctx = browser.new_context(viewport={"width": 1440, "height": 900})
