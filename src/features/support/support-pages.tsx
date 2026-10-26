@@ -1,8 +1,9 @@
 "use client";
 
+import { AddExistingCustomerDialog } from "@/features/customers/add-existing";
 import { EnrollmentsView } from "@/features/customers/enrollments-view";
 import { isUnopenedCustomer } from "@/lib/lead-row";
-import { AlertTriangle, Banknote, CalendarClock, CheckCircle2, Hand, Inbox, ListChecks, Users } from "lucide-react";
+import { AlertTriangle, Banknote, CalendarClock, CheckCircle2, Hand, Inbox, ListChecks, UserPlus, Users } from "lucide-react";
 import { useState } from "react";
 import { DueBadge, SupportStatusBadge, NewBadge } from "@/components/ui/badges";
 import { Button } from "@/components/ui/button";
@@ -137,9 +138,12 @@ function DueLine({ inquiryId, name, label, dueAt, icon, action }: { inquiryId: s
 /** Customers (support) / Support (managers): every enrolled customer, with filters that combine (Part B). */
 export function CustomersPage() {
   const { me } = useWorkspace();
+  const [adding, setAdding] = useState(false);
   return (
     <div>
-      <PageHeader title={me.role === "manager" ? "Support" : "Customers"} subtitle="Every enrolled customer. Filter by course, dates, status, payments and owners; every filter you set must match." />
+      <PageHeader title={me.role === "manager" ? "Support" : "Customers"} subtitle="Every enrolled customer. Filter by course, dates, status, payments and owners; every filter you set must match."
+        actions={<Button variant="primary" icon={<UserPlus size={16} />} onClick={() => setAdding(true)}>Add existing customer</Button>} />
+      {adding && <AddExistingCustomerDialog onClose={() => setAdding(false)} />}
       {me.role === "manager" && <PaymentsDueCard owner="any" className="mb-4" />}
       <EnrollmentsView />
     </div>
