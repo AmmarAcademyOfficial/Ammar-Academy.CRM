@@ -231,6 +231,8 @@ export interface Enrollment {
   originalSalesOwnerId: ID | null;
   createdAt: Timestamp;
   version: number;
+  /** Package hours used before the customer was added to the CRM (Part D). */
+  packageHoursBefore: number;
 }
 
 export type PaymentMethod = "bank_transfer" | "instapay" | "mobile_wallet" | "cash" | "card" | "other";
@@ -307,6 +309,8 @@ export interface TeachingSession {
   note?: string;
   recordedById?: ID;
   recordedAt?: Timestamp;
+  /** Sessions of one weekly series share this id (none for a single session). */
+  seriesId?: ID;
 }
 
 /** A teacher and rate for a private customer (enrollment) or a group course. */

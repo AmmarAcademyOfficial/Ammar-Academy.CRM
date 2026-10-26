@@ -103,6 +103,7 @@ export const mapEnrollment = (r: Row): Enrollment => ({
   originalSalesOwnerId: r.original_sales_owner_id ? str(r.original_sales_owner_id) : null,
   createdAt: iso(r.created_at),
   version: Number(r.version),
+  packageHoursBefore: Number(r.package_hours_before ?? 0),
 });
 
 export const mapPayment = (r: Row): PaymentSubmission => ({
@@ -177,6 +178,7 @@ export const mapSession = (r: Row): TeachingSession => ({
   note: strOpt(r.note),
   recordedById: strOpt(r.recorded_by),
   recordedAt: isoOpt(r.recorded_at),
+  seriesId: strOpt(r.series_id),
 });
 
 export const mapPaymentDue = (r: Row): PaymentDue => ({

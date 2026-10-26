@@ -1,7 +1,7 @@
 "use client";
 
 import { CalendarClock, CheckCircle2, Trash2 } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Pill } from "@/components/ui/badges";
 import { Button } from "@/components/ui/button";
 import { cn as clsx } from "@/components/ui/cn";
@@ -10,9 +10,10 @@ import { Dialog } from "@/components/ui/overlay";
 import type { SessionAssignment } from "@/domain/dto";
 import { cairoParts, formatCairo } from "@/domain/rules";
 import type { SessionStatus, TeachingSession } from "@/domain/types";
+import { useToast } from "@/components/ui/toast";
 import { useRunAction } from "@/lib/run-action";
 import { useWorkspace } from "@/lib/workspace";
-import { deleteSession, recordSession, scheduleSessions } from "@/server/session-actions";
+import { changeSessionSeries, deleteSession, recordSession, scheduleSessions, sessionSeriesInfo, type SeriesInfo } from "@/server/session-actions";
 import { cairoLocalInput, fromCairoLocal } from "@/features/lead-panel/dialogs";
 
 export const SESSION_STATUS: Record<SessionStatus, [string, string]> = {
@@ -61,6 +62,7 @@ export function SessionLine({ s, showCustomer = true, canRun, onRecord, extra }:
 export function RecordDialog({ session, onClose }: { session: TeachingSession; onClose: () => void }) {
   const { ref, me, now } = useWorkspace();
   const runAction = useRunAction();
+  const toast = useToast();
   const st = ref.settings;
   const future = new Date(session.startsAt) > new Date(now.getTime() + 3600_000);
   const [status, setStatus] = useState<SessionStatus>(session.status === "scheduled" ? (future ? "scheduled" : "done") : session.status);
@@ -70,6 +72,17 @@ export function RecordDialog({ session, onClose }: { session: TeachingSession; o
   const [when, setWhen] = useState(cairoLocalInput(new Date(session.startsAt)));
   const [planned, setPlanned] = useState(String(session.plannedHours));
   const [busy, setBusy] = useState(false);
+  // A session of a weekly series: a move or a removal can also apply to the following ones or the whole series.
+  const [series, setSeries] = useState<SeriesInfo | null>(null);
+  const [scope, setScope] = useState<"one" | "following" | "all">("one");
+  useEffect(() => {
+    if (!session.seriesId || session.status !== "scheduled") return;
+    let live = true;
+    void sessionSeriesInfo(session.id).then((r) => { if (live && r.ok && r.value.seriesId) setSeries(r.value); });
+    return () => { live = false; };
+  }, [session.id, session.seriesId, session.status]);
+  const inSeries = !!series && status === "scheduled";
+  const reach = scope === "following" ? series?.following ?? 1 : scope === "all" ? series?.all ?? 1 : 1;
   const teacher = ref.teachers.find((t) => t.id === session.teacherId)?.fullName ?? "";
   const paidPreview =
     status === "done" ? Number(hours) || 0
@@ -79,6 +92,12 @@ export function RecordDialog({ session, onClose }: { session: TeachingSession; o
   const save = async () => {
     setBusy(true);
     const moved = status === "scheduled" && (when !== cairoLocalInput(new Date(session.startsAt)) || Number(planned) !== session.plannedHours);
+    if (inSeries && scope !== "one" && moved) {
+      const r = await runAction(changeSessionSeries({ id: session.id, scope, action: "move", startsAt: fromCairoLocal(when), plannedHours: Number(planned) }), null);
+      setBusy(false);
+      if (r.ok) { toast.success(`${r.value} session${r.value === 1 ? "" : "s"} moved`); onClose(); }
+      return;
+    }
     const r = await runAction(recordSession({
       id: session.id, status, hours: status === "done" ? Number(hours) : undefined, late: status === "cancelled_student" ? late : undefined, note: note || undefined,
       startsAt: moved ? fromCairoLocal(when) : undefined, plannedHours: moved ? Number(planned) : undefined,
@@ -88,6 +107,12 @@ export function RecordDialog({ session, onClose }: { session: TeachingSession; o
   };
   const remove = async () => {
     setBusy(true);
+    if (inSeries && scope !== "one") {
+      const s2 = await runAction(changeSessionSeries({ id: session.id, scope, action: "remove" }), null);
+      setBusy(false);
+      if (s2.ok) { toast.success(`${s2.value} session${s2.value === 1 ? "" : "s"} removed`); onClose(); }
+      return;
+    }
     const r = await runAction(deleteSession(session.id), "Session removed");
     setBusy(false);
     if (r.ok) onClose();
@@ -97,7 +122,7 @@ export function RecordDialog({ session, onClose }: { session: TeachingSession; o
   return (
     <Dialog open onClose={onClose} title="Record session" description={`${teacher} · ${formatCairo(session.startsAt)} · ${hoursText(session.plannedHours)} planned`}
       footer={<>
-        {canRemove && <Button variant="danger" icon={<Trash2 size={14} />} className="mr-auto" disabled={busy} onClick={remove}>Remove</Button>}
+        {canRemove && <Button variant="danger" icon={<Trash2 size={14} />} className="mr-auto" disabled={busy} onClick={remove}>{inSeries && scope !== "one" ? `Remove ${reach}` : "Remove"}</Button>}
         <Button onClick={onClose}>Cancel</Button>
         <Button variant="primary" disabled={busy || (status === "done" && !(Number(hours) > 0))} onClick={save}>{busy ? "Saving…" : "Save"}</Button>
       </>}>
@@ -123,6 +148,19 @@ export function RecordDialog({ session, onClose }: { session: TeachingSession; o
             <Checkbox label={`Cancelled less than ${st.lateCancelHours} hours before the session`} checked={late} onChange={setLate}
               description={st.lateCancelPaid ? "A late cancellation is paid to the teacher and uses the student's hours." : "Late cancellations are not paid (Settings)."} />
           </div>
+        )}
+        {inSeries && series && (
+          <fieldset className="sm:col-span-2" data-testid="series-scope">
+            <legend className="mb-1.5 text-sm font-medium">Apply a move or removal to</legend>
+            <div className="grid gap-1.5 sm:grid-cols-3" role="radiogroup">
+              {([["one", "Only this session"], ["following", `This and the following (${series.following})`], ["all", `All not yet recorded (${series.all})`]] as const).map(([v, label]) => (
+                <label key={v} className={clsx("flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm", scope === v ? "border-navy-900 bg-navy-50 font-medium" : "border-line hover:bg-navy-50/60")}>
+                  <input type="radio" name="series-scope" checked={scope === v} onChange={() => setScope(v)} className="accent-navy-900" />{label}
+                </label>
+              ))}
+            </div>
+            {scope !== "one" && <p className="mt-1.5 text-xs text-muted">{scope === "following" ? "Each following session moves by the same amount as this one." : "Every session of the series moves by the same amount as this one."} Recorded sessions{series.recorded ? ` (${series.recorded})` : ""} and closed salary months are not changed.</p>}
+          </fieldset>
         )}
         {status === "scheduled" && (
           <>
