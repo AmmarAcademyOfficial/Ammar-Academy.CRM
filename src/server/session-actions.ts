@@ -61,3 +61,34 @@ export async function deleteSession(id: string): Promise<Result<void>> {
     await asUser(staff.id, (tx) => tx`select public.delete_session(${uuid.parse(id)})`);
   });
 }
+
+export interface SeriesInfo { seriesId: string | null; total: number; following: number; all: number; recorded: number }
+
+/** How many sessions of this session's series a change could reach. */
+export async function sessionSeriesInfo(id: string): Promise<Result<SeriesInfo>> {
+  return attempt(async () => {
+    const staff = await requireStaff();
+    const [{ r }] = await asUser(staff.id, (tx) => tx<{ r: SeriesInfo }[]>`select public.session_series_info(${uuid.parse(id)}) as r`);
+    return r;
+  });
+}
+
+const seriesSchema = z.object({
+  id: uuid,
+  scope: z.enum(["following", "all"]),
+  action: z.enum(["move", "remove"]),
+  startsAt: z.string().datetime({ offset: true }).optional(),
+  plannedHours: z.coerce.number().min(0.25).max(12).optional(),
+});
+
+/** Move or remove this and the following sessions, or the whole series (only those still scheduled). */
+export async function changeSessionSeries(input: z.input<typeof seriesSchema>): Promise<Result<number>> {
+  return attempt(async () => {
+    const v = parse(seriesSchema, input);
+    const staff = await requireStaff();
+    const [{ r }] = await asUser(staff.id, (tx) => tx<{ r: { changed: number } }[]>`select public.change_session_series(${tx.json({
+      id: v.id, scope: v.scope, action: v.action, starts_at: v.startsAt ?? null, planned_hours: v.plannedHours ?? null,
+    })}) as r`);
+    return r.changed;
+  });
+}

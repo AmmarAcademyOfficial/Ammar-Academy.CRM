@@ -17,7 +17,8 @@ export function SessionsSection({ detail, canWork }: { detail: LeadDetail; canWo
   const [showAll, setShowAll] = useState(false);
   const course = courseOf(ref, detail.enrollment!.courseId);
   const bought = course?.sessionsCount && course?.sessionHours ? course.sessionsCount * course.sessionHours : null;
-  const used = detail.sessions.reduce((t, s) => t + s.studentHours, 0);
+  // Hours used before the customer was added to the CRM count too (Part D).
+  const used = (detail.enrollment?.packageHoursBefore ?? 0) + detail.sessions.reduce((t, s) => t + s.studentHours, 0);
   const left = bought !== null ? bought - used : null;
   const assignments: SessionAssignment[] = detail.teachers.filter((a) => !a.endedOn).map((a) => ({
     id: a.id, teacherId: a.teacherId, rateId: a.rateId, enrollmentId: a.enrollmentId, subject: a.subject,
@@ -27,6 +28,14 @@ export function SessionsSection({ detail, canWork }: { detail: LeadDetail; canWo
   const upcoming = detail.sessions.filter((s) => new Date(s.startsAt) > now);
   const shown = [...past.slice(showAll ? 0 : -5), ...upcoming.slice(0, showAll ? undefined : 3)];
   const hidden = detail.sessions.length - shown.length;
+  // Weekly series as one line each: "Weekly · Tuesdays 5:00 PM · 4 of 6 left".
+  const series = [...new Set(detail.sessions.map((x) => x.seriesId).filter(Boolean))].map((id) => {
+    const list = detail.sessions.filter((x) => x.seriesId === id);
+    const first = new Date(list[0].startsAt);
+    const day = new Intl.DateTimeFormat("en-GB", { weekday: "long", timeZone: "Africa/Cairo" }).format(first);
+    const time = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone: "Africa/Cairo" }).format(first);
+    return { id: id as string, label: `Weekly · ${day}s ${time}`, left: list.filter((x) => x.status === "scheduled").length, total: list.length };
+  });
 
   if (detail.teachers.length === 0 && detail.sessions.length === 0) return null;
   return (
@@ -45,6 +54,13 @@ export function SessionsSection({ detail, canWork }: { detail: LeadDetail; canWo
             <div className={left !== null && left <= 2 ? "h-full bg-bad" : "h-full bg-navy-700"} style={{ width: `${Math.min(100, (used / bought) * 100)}%` }} />
           </div>
         </div>
+      )}
+      {series.length > 0 && (
+        <ul className="mb-2 flex flex-wrap gap-1.5" aria-label="Weekly series">
+          {series.map((x) => (
+            <li key={x.id} className="rounded-full border border-line bg-white px-2.5 py-0.5 text-xs" data-series={x.label}>{x.label} · {x.left} of {x.total} left</li>
+          ))}
+        </ul>
       )}
       {detail.sessions.length === 0 ? (
         <p className="text-sm text-muted">{canWork ? "No sessions yet. Schedule the first one." : "No sessions yet."}</p>
