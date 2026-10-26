@@ -16,6 +16,7 @@ export const NOTIFICATION_GROUPS: { title: string; events: NotificationEvent[] }
     title: "Leads",
     events: [
       { key: "lead_assigned", label: "New lead assigned", description: "A lead is given to the agent, by the turn order or by a manager.", roles: ["sales"] },
+      { key: "leads_moved_away", label: "Leads moved to another agent", description: "A manager moved some of the agent's leads to someone else, or back to the queue (one message per move).", roles: ["sales"] },
       { key: "returning_customer", label: "Returning customer", description: "A customer who had a lead with this agent before comes back.", roles: ["sales"] },
       { key: "form_resubmitted", label: "Form submitted again", description: "One of the agent's customers fills in the form again.", roles: ["sales"] },
       { key: "lead_not_opened", label: "Lead not opened yet", description: "Reminder to the agent when an assigned lead has not been opened in time.", roles: ["sales"] },
