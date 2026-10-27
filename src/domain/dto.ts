@@ -328,6 +328,8 @@ export interface ReportData {
   daily: { day: string; inquiries: number; enrollments: number }[];
   firstContact: { medianWorkingMinutes: number | null; medianClockMinutes: number | null; measured: number; withinTarget: number; notYet: number };
   enrollments: number;
+  /** Phase 1: of those, second or later courses of the same customer. */
+  additionalEnrollments?: number;
   confirmed: (MoneyTotal & { count: number })[];
   overdueFollowUps: number;
   overdueByOwner: LabelCount[];
