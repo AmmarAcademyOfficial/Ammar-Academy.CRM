@@ -72,7 +72,10 @@ def open_payments(page, path="/customers"):
     page.get_by_label("Search customers").fill("Sara")
     page.locator("[data-customer='Sara Nasser']:visible").first.click()
     panel = page.get_by_role("dialog", name="Customer details")
+    expect(panel.get_by_role("tab", name="Payments")).to_be_visible()
+    page.wait_for_timeout(500)  # the panel slides in
     panel.get_by_role("tab", name="Payments").click()
+    expect(panel.get_by_role("tab", name="Payments")).to_have_attribute("aria-selected", "true")
     return panel
 
 
@@ -131,7 +134,7 @@ with sync_playwright() as p:
     check("The support owner is told about each new course", told == 2, str(told))
 
     # ── 3. Support: one Support tab per course ─────────────────────────────
-    u.reload()
+    u = sign_in(browser.new_context(viewport={"width": 1440, "height": 900}), "Laila Ibrahim", "/my-work")
     panel = open_payments(u)
     panel.get_by_role("tab", name="Support").click()
     course_pick = panel.get_by_label("Course")
@@ -148,7 +151,7 @@ with sync_playwright() as p:
     check("The accountant sees every lead, without Add customer or Move leads",
           a.get_by_role("button", name="Add customer").count() == 0 and a.get_by_role("button", name="Move leads").count() == 0)
     apanel = open_payments(a)
-    expect(apanel.get_by_text("+971 50 555 0130")).to_be_visible()
+    expect(apanel.get_by_text("+971505550130").first).to_be_visible()
     check("The accountant opens the customer record with the phone number but no sales actions",
           apanel.get_by_role("button", name="Record outcome").count() == 0 and apanel.get_by_role("button", name="Add another enrollment").count() == 0
           and apanel.get_by_role("link", name="Call").count() == 0)
@@ -169,7 +172,7 @@ with sync_playwright() as p:
     shot(a, "03-review", full=True)
     item.get_by_role("button", name="Reviewed").click()
     expect(a.get_by_text("Marked as reviewed")).to_be_visible()
-    a.locator("[data-review-item='Sara Nasser']").filter(has_text=SPEAKING).get_by_role("button", name="Query…").click()
+    a.locator("[data-review-item='Sara Nasser']").filter(has_text=SPEAKING).get_by_role("button", name="Query").click()
     q = a.get_by_role("dialog", name=f"Query {SPEAKING}")
     q.get_by_label("What needs checking?").fill("Was the 1:1 price agreed with a manager?")
     q.get_by_role("button", name="Send query").click()
