@@ -163,9 +163,9 @@ with sync_playwright() as p:
     d.locator("#receipt-file").set_input_files(str(receipt))
     expect(d.get_by_text("instapay-receipt.png")).to_be_visible()
     shot(s, "03-submit-payment")
-    d.get_by_role("button", name="Submit for confirmation").click()
-    expect(s.get_by_text("Payment submitted. A manager will confirm it.")).to_be_visible()
-    expect(panel.get_by_text("waiting for manager review (not counted yet)")).to_be_visible()
+    d.get_by_role("button", name="Record payment").click()
+    expect(s.get_by_text("Payment recorded. A manager or the accountant will confirm it.")).to_be_visible()
+    expect(panel.get_by_text("waiting for confirmation by a manager or the accountant")).to_be_visible()
     pay = sql("""select p.id, p.status, p.receipt_mime from public.payments p join public.enrollments e on e.id = p.enrollment_id
                  join public.inquiries i on i.id = e.inquiry_id join public.contacts c on c.id = i.contact_id where c.name = 'Nadine Wahba'""")[0]
     check("Payment saved as pending with a private receipt", pay["status"] == "pending" and pay["receipt_mime"] == "image/png")
