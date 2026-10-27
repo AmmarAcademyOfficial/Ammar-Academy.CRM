@@ -96,12 +96,24 @@ export async function setInquiryCourse(inquiryId: string, courseId: string | nul
 
 // ── Enrollments and payments ─────────────────────────────────────────────
 
-export async function saveEnrollment(input: { inquiryId: string; courseId: string; agreedTotal: number; priceNote?: string }): Promise<Result<string>> {
+/**
+ * Start, add or change an enrollment. enrollmentId changes that one; add: true adds another course
+ * for the same customer (Phase 1), crediting salesAgentId ("" = nobody / before the CRM).
+ */
+export async function saveEnrollment(input: {
+  inquiryId: string; courseId: string; agreedTotal: number; priceNote?: string; enrollmentId?: string; add?: boolean; salesAgentId?: string | null;
+}): Promise<Result<string>> {
   return attempt(async () => {
-    const v = z.object({ inquiryId: uuid, courseId: uuid, agreedTotal: money.positive("Enter the agreed total."), priceNote: z.string().max(300).optional() }).parse(input);
-    const [{ id }] = await asMe((tx) => tx<{ id: string }[]>`select public.save_enrollment(${tx.json({
+    const v = z.object({
+      inquiryId: uuid, courseId: uuid, agreedTotal: money.positive("Enter the agreed total."), priceNote: z.string().max(300).optional(),
+      enrollmentId: uuid.optional(), add: z.boolean().optional(), salesAgentId: z.union([uuid, z.literal(""), z.null()]).optional(),
+    }).parse(input);
+    const body: Record<string, unknown> = {
       inquiry_id: v.inquiryId, course_id: v.courseId, agreed_total: v.agreedTotal, price_note: v.priceNote ?? null,
-    })}) as id`);
+      enrollment_id: v.enrollmentId ?? null, add: v.add ?? false,
+    };
+    if (v.salesAgentId !== undefined) body.sales_agent_id = v.salesAgentId ?? "";
+    const [{ id }] = await asMe((tx) => tx<{ id: string }[]>`select public.save_enrollment(${tx.json(body as never)}) as id`);
     return id;
   });
 }
@@ -128,6 +140,39 @@ export async function submitPayment(input: z.input<typeof paymentSchema>): Promi
       reference: v.reference ?? null, note: v.note ?? null, receipt: receipt as never, kind: v.kind ?? null,
     })}) as id`);
     return id;
+  });
+}
+
+const splitSchema = z.object({
+  parts: z.array(z.object({ enrollmentId: uuid, amount: money.positive("Enter each amount."), kind: z.enum(["deposit", "installment", "full"]) })).min(2).max(10),
+  paidOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Enter the payment date."),
+  method: z.enum(["bank_transfer", "instapay", "mobile_wallet", "cash", "card", "other"]),
+  reference: z.string().max(100).optional(),
+  note: z.string().max(1000).optional(),
+  receiptToken: z.string().max(4000).optional(),
+});
+
+/** One transfer split across a customer's enrollments: one reference and one receipt (Phase 1). */
+export async function submitSplitPayment(input: z.input<typeof splitSchema>): Promise<Result<string[]>> {
+  return attempt(async () => {
+    const staff = await requireStaff();
+    const parsed = splitSchema.safeParse(input);
+    if (!parsed.success) throw new ValidationError(parsed.error.issues[0].message);
+    const v = parsed.data;
+    const receipt = v.receiptToken ? readReceiptToken(v.receiptToken, staff.id) : null;
+    if (v.receiptToken && !receipt) throw new ValidationError("The uploaded receipt expired. Please attach it again.");
+    const [{ r }] = await asUser(staff.id, (tx) => tx<{ r: { ids: string[] } }[]>`select public.submit_split_payment(${tx.json({
+      parts: v.parts.map((x) => ({ enrollment_id: x.enrollmentId, amount: x.amount, kind: x.kind })),
+      paid_on: v.paidOn, method: v.method, reference: v.reference ?? null, note: v.note ?? null, receipt: receipt as never,
+    })}) as r`);
+    return r.ids;
+  });
+}
+
+/** The accountant or a manager marks an enrollment Reviewed, or Queried with a note (never blocks anything). */
+export async function reviewEnrollment(enrollmentId: string, status: "reviewed" | "queried", note?: string): Promise<Result<void>> {
+  return attempt(async () => {
+    await asMe((tx) => tx`select public.review_enrollment(${uuid.parse(enrollmentId)}, ${z.enum(["reviewed", "queried"]).parse(status)}, ${note?.trim() || null})`);
   });
 }
 

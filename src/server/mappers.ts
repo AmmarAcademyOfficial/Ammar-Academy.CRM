@@ -104,6 +104,15 @@ export const mapEnrollment = (r: Row): Enrollment => ({
   createdAt: iso(r.created_at),
   version: Number(r.version),
   packageHoursBefore: Number(r.package_hours_before ?? 0),
+  additional: Boolean(r.additional),
+  addedAsExisting: Boolean(r.added_as_existing),
+  review: {
+    status: (r.review_status as Enrollment["review"]["status"]) ?? "to_review",
+    reason: str(r.review_reason ?? "New enrollment"),
+    byId: r.reviewed_by ? str(r.reviewed_by) : null,
+    at: r.reviewed_at ? iso(r.reviewed_at) : null,
+    note: strOpt(r.review_note) ?? null,
+  },
 });
 
 export const mapPayment = (r: Row): PaymentSubmission => ({
@@ -126,6 +135,7 @@ export const mapPayment = (r: Row): PaymentSubmission => ({
   reversedAt: isoOpt(r.reversed_at),
   reversalReason: strOpt(r.reversal_reason),
   kind: (r.kind as PaymentSubmission["kind"]) ?? undefined,
+  splitGroup: r.split_group ? str(r.split_group) : undefined,
 });
 
 const dayOf = (v: unknown): string | undefined => {

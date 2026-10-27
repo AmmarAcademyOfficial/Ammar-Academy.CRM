@@ -93,8 +93,22 @@ export interface PaymentTotalsDTO {
   balance: number;
 }
 
+/** Phase 1: one enrollment of a customer with everything that belongs to it. */
+export interface EnrollmentBundle {
+  enrollment: Enrollment;
+  payments: PaymentSubmission[];
+  totals: PaymentTotalsDTO;
+  dues: PaymentDue[];
+  teachers: TeacherAssignment[];
+  sessions: TeachingSession[];
+  onboarding?: Onboarding;
+  supportFollowUps: SupportFollowUp[];
+}
+
 export interface LeadDetail {
   row: LeadRowDTO;
+  /** Every enrollment of this customer, oldest first (Phase 1). The single fields below hold the first. */
+  courses: EnrollmentBundle[];
   enrollment?: Enrollment;
   payments: PaymentSubmission[];
   totals?: PaymentTotalsDTO;
@@ -508,9 +522,44 @@ export interface EnrollmentListRow {
 }
 export interface EnrollmentList {
   total: number;
+  /** Distinct customers among the matching enrollments (Phase 1: one customer can hold several). */
+  people?: number;
   page: number;
   pageSize: number;
   scope: "mine" | "all";
   totals: { currency: string; count: number; agreed: number; paid: number; balance: number; overdue: number }[];
   rows: EnrollmentListRow[];
+}
+
+/** Phase 1: what waits for the accountant's or a manager's review. */
+export interface ReviewQueueItem {
+  enrollmentId: string;
+  inquiryId: string;
+  customerName: string;
+  phone: string | null;
+  studentName: string | null;
+  courseName: string;
+  programName: string;
+  currency: string;
+  agreed: number;
+  price: number | null;
+  priceNote: string | null;
+  priceDiffers: boolean;
+  additional: boolean;
+  addedAsExisting: boolean;
+  createdAt: string;
+  createdBy: string | null;
+  salesAgentName: string | null;
+  paid: number;
+  pending: number;
+  reason: string;
+  status: "to_review" | "queried";
+  note: string | null;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+}
+export interface ReviewQueue {
+  pendingPayments: number;
+  items: ReviewQueueItem[];
+  recent: { enrollmentId: string; inquiryId: string; customerName: string; courseName: string; reviewedBy: string | null; reviewedAt: string; note: string | null }[];
 }

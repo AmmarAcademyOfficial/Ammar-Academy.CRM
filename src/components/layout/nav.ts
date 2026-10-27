@@ -42,7 +42,15 @@ export const NAV: Record<Role, NavItem[]> = {
     { path: "/reports", label: "Reports", icon: BarChart3 },
     { path: "/settings", label: "Settings", icon: Settings },
   ],
-  accountant: [{ path: "/accounting", label: "Accounting", icon: Calculator }],
+  // Phase 1: the accountant sees everything (read-only) and reviews it.
+  accountant: [
+    { path: "/accounting", label: "Accounting", icon: Calculator },
+    { path: "/leads", label: "Leads", icon: Users },
+    { path: "/customers", label: "Customers", icon: Headset },
+    { path: "/sessions", label: "Sessions", icon: CalendarDays },
+    { path: "/payments", label: "Payments", icon: CreditCard },
+    { path: "/reports", label: "Reports", icon: BarChart3 },
+  ],
 };
 
 export const HOME: Record<Role, string> = {

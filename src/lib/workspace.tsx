@@ -52,15 +52,8 @@ export function WorkspaceProvider({ me, reference, serverNow, children }: { me: 
     [router],
   );
 
-  // Accountants have no customer panel (no access to leads or phone numbers): a notification about
-  // a customer takes them to the payments in Accounting instead.
-  const openInquiry = useCallback(
-    (id: ID | null) => {
-      if (me.role !== "accountant") setOpenInquiryId(id);
-      else if (id) router.push("/accounting?tab=payments");
-    },
-    [me.role, router],
-  );
+  // Everyone opens customer records (Phase 1: the accountant reads them, without changing them).
+  const openInquiry = useCallback((id: ID | null) => setOpenInquiryId(id), []);
 
   const value = useMemo<Workspace>(
     () => ({ me, ref: reference, now, openInquiryId, openInquiry, dataVersion, invalidate }),

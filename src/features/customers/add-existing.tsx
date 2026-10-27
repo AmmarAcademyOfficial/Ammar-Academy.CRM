@@ -118,7 +118,8 @@ export function AddExistingCustomerDialog({ onClose }: { onClose: () => void }) 
     }), null);
     setBusy(false);
     if (r.ok) {
-      toast.success(r.value.pending > 0 ? "Customer added. The past payments are waiting for a manager or the accountant to confirm." : "Customer added");
+      const what = r.value.additional ? "Course added to the customer's record" : "Customer added";
+      toast.success(r.value.pending > 0 ? `${what}. The past payments are waiting for a manager or the accountant to confirm.` : what);
       onClose();
       openInquiry(r.value.inquiryId);
     }
@@ -143,7 +144,7 @@ export function AddExistingCustomerDialog({ onClose }: { onClose: () => void }) 
               <div className="rounded-lg border border-navy-900/20 bg-navy-50 p-3 text-sm sm:col-span-2" data-testid="phone-match">
                 <p className="flex items-center gap-2 font-medium"><UserCheck size={16} aria-hidden /> Already in the CRM: {match.name}</p>
                 <ul className="mt-1 text-xs text-muted">{match.inquiries.slice(0, 4).map((i) => <li key={i.inquiryId}>{i.program}{i.student ? ` · ${i.student}` : ""} · {i.stage}{i.course ? ` · ${i.course}` : ""}</li>)}</ul>
-                <p className="mt-2 text-xs">This enrollment will be added to {match.name}. For a different person, use their own phone number.</p>
+                <p className="mt-2 text-xs">The course is added to {match.name}&apos;s record, beside their other courses. If it is for a different child, enter that child&apos;s name: they get their own record. For a different person, use their own phone number.</p>
               </div>
             )}
             {!attaching && (

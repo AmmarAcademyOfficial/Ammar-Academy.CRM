@@ -9,7 +9,7 @@ const isoDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 /** Sessions for support and managers. */
 export async function GET(req: NextRequest) {
   return apiRoute(async (staff) => {
-    if (staff.role !== "manager" && staff.role !== "support") forbidden("Sessions are for support and managers.");
+    if (staff.role === "sales") forbidden("Sessions are for support, managers and the accountant.");
     const p = req.nextUrl.searchParams;
     return sessionsData(staff, isoDay.parse(p.get("from")), isoDay.parse(p.get("to")));
   });

@@ -19,6 +19,8 @@ type View = "day" | "week";
 /** Sessions (support and managers): today's and this week's sessions, recording, and what still needs recording. */
 export function SessionsPage() {
   const { ref, me, now } = useWorkspace();
+  // The accountant reads sessions; support and managers schedule and record them.
+  const canRun = me.role !== "accountant";
   const today = cairoParts(now).date;
   const [view, setView] = useState<View>("day");
   const [day, setDay] = useState(today);
@@ -51,7 +53,7 @@ export function SessionsPage() {
       <PageHeader
         title="Sessions"
         subtitle={me.role === "support" ? "Your customers' sessions and group classes. Record each one after it takes place." : "Every teaching session. Support records each one after it takes place."}
-        actions={<Button variant="primary" icon={<CalendarPlus size={16} />} onClick={() => setScheduling(true)} disabled={!data}>Schedule session</Button>}
+        actions={canRun ? <Button variant="primary" icon={<CalendarPlus size={16} />} onClick={() => setScheduling(true)} disabled={!data}>Schedule session</Button> : undefined}
       />
 
       <Card className="mb-4 flex flex-wrap items-center gap-2 p-3">
@@ -82,7 +84,7 @@ export function SessionsPage() {
           <CardHeader title={<span className="flex items-center gap-2"><AlertTriangle size={16} className="text-warn" aria-hidden /> Needs recording</span>} count={unrecorded.length}
             subtitle="Earlier sessions still marked as scheduled. Record what happened so teachers are paid correctly." />
           <ul className="divide-y divide-line" aria-label="Needs recording">
-            {unrecorded.map((s) => <SessionLine key={s.id} s={s} canRun onRecord={setRecording} />)}
+            {unrecorded.map((s) => <SessionLine key={s.id} s={s} canRun={canRun} onRecord={setRecording} />)}
           </ul>
         </Card>
       )}
@@ -93,13 +95,13 @@ export function SessionsPage() {
         {!data && loading ? <SkeletonRows rows={4} /> : sessions.length === 0 ? (
           <EmptySessions>No sessions {view === "day" ? "on this day" : "this week"}.</EmptySessions>
         ) : view === "day" ? (
-          <ul className="divide-y divide-line" aria-label="Sessions">{sessions.map((s) => <SessionLine key={s.id} s={s} canRun onRecord={setRecording} />)}</ul>
+          <ul className="divide-y divide-line" aria-label="Sessions">{sessions.map((s) => <SessionLine key={s.id} s={s} canRun={canRun} onRecord={setRecording} />)}</ul>
         ) : (
           <div aria-label="Sessions">
             {[...byDay.entries()].map(([d, list]) => (
               <section key={d} aria-label={formatDay(d)}>
                 <h3 className="border-b border-line bg-canvas px-4 py-1.5 text-xs font-semibold text-muted">{formatDay(d)}{d === today ? " · Today" : ""}</h3>
-                <ul className="divide-y divide-line">{list.map((s) => <SessionLine key={s.id} s={s} canRun onRecord={setRecording} />)}</ul>
+                <ul className="divide-y divide-line">{list.map((s) => <SessionLine key={s.id} s={s} canRun={canRun} onRecord={setRecording} />)}</ul>
               </section>
             ))}
           </div>

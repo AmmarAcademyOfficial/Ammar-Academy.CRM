@@ -91,7 +91,7 @@ export function EnrollmentsView() {
   const pages = Math.max(1, Math.ceil((data?.total ?? 0) / PAGE_SIZE));
   const today = cairoParts(now).date;
   const course = (id: string) => ref.courses.find((c) => c.id === id);
-  const showPhone = me.role !== "accountant";
+  const showPhone = true; // Phase 1: the accountant sees phone numbers too
   const canDownload = me.role === "manager" || me.role === "accountant";
   const sp = { sort, onSort: toggleSort };
 
@@ -133,7 +133,7 @@ export function EnrollmentsView() {
         </div>
         {(count > 0 || filters.search) && (
           <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2.5 text-sm">
-            <span className="font-medium" data-testid="enrollment-count">{data ? `${data.total} matching` : "…"}</span>
+            <span className="font-medium" data-testid="enrollment-count">{data ? `${data.total} matching${data.people !== undefined && data.people !== data.total ? ` · ${data.people} customer${data.people === 1 ? "" : "s"}` : ""}` : "…"}</span>
             <Chips f={filters} onChange={apply} />
             <button className="ml-auto text-xs font-medium text-navy-700 hover:underline" onClick={() => apply({ ...EMPTY_ENROLLMENT_FILTERS })}>Clear filters</button>
           </div>

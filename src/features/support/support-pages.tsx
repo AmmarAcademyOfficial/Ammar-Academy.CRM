@@ -142,9 +142,9 @@ export function CustomersPage() {
   return (
     <div>
       <PageHeader title={me.role === "manager" ? "Support" : "Customers"} subtitle="Every enrolled customer. Filter by course, dates, status, payments and owners; every filter you set must match."
-        actions={<Button variant="primary" icon={<UserPlus size={16} />} onClick={() => setAdding(true)}>Add existing customer</Button>} />
+        actions={me.role !== "accountant" ? <Button variant="primary" icon={<UserPlus size={16} />} onClick={() => setAdding(true)}>Add existing customer</Button> : undefined} />
       {adding && <AddExistingCustomerDialog onClose={() => setAdding(false)} />}
-      {me.role === "manager" && <PaymentsDueCard owner="any" className="mb-4" />}
+      {(me.role === "manager" || me.role === "accountant") && <PaymentsDueCard owner="any" className="mb-4" />}
       <EnrollmentsView />
     </div>
   );

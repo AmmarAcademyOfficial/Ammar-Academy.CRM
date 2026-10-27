@@ -233,6 +233,12 @@ export interface Enrollment {
   version: number;
   /** Package hours used before the customer was added to the CRM (Part D). */
   packageHoursBefore: number;
+  /** Phase 1: a second or later enrollment of the same customer. */
+  additional: boolean;
+  /** Entered through Add existing customer. */
+  addedAsExisting: boolean;
+  /** Review by the accountant or a manager (never blocks anything). */
+  review: { status: "to_review" | "reviewed" | "queried"; reason: string; byId: ID | null; at: Timestamp | null; note: string | null };
 }
 
 export type PaymentMethod = "bank_transfer" | "instapay" | "mobile_wallet" | "cash" | "card" | "other";
@@ -259,6 +265,8 @@ export interface PaymentSubmission {
   reversalReason?: string;
   /** Deposit, installment or full payment (older records were labelled automatically). */
   kind?: PaymentKind;
+  /** Phase 1: one transfer split across a customer's enrollments shares this id. */
+  splitGroup?: ID;
 }
 
 export type PaymentKind = "deposit" | "installment" | "full";
