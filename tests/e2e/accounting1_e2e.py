@@ -15,6 +15,7 @@ import sys
 import zlib
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from playwright.sync_api import expect, sync_playwright
 import hydration  # noqa: F401  (waits for the page to be interactive after each load)
@@ -71,7 +72,7 @@ def uid(name):
     return sql("select id from public.profiles where full_name = $1", [name])[0]["id"]
 
 
-cairo_today = (datetime.now(timezone.utc) + timedelta(hours=3)).date()
+cairo_today = datetime.now(ZoneInfo("Africa/Cairo")).date()
 iso = lambda d: d.isoformat()
 laila, hana = uid("Laila Ibrahim"), uid("Hana Farouk")
 jana = sql("""select i.id as inquiry, e.id as enrollment, o.id as onboarding from public.inquiries i join public.contacts c on c.id = i.contact_id

@@ -106,3 +106,8 @@ export async function createInquiry(user: TestUser, extra: Record<string, unknow
 export async function inquiryVersion(id: string): Promise<number> {
   return (await admin<{ version: number }>("select version from public.inquiries where id = $1", [id]))[0].version;
 }
+
+/** Today's date in Cairo (YYYY-MM-DD), through the time-zone database: Egypt's offset changes with summer time. */
+export function cairoDate(at: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo", year: "numeric", month: "2-digit", day: "2-digit" }).format(at);
+}

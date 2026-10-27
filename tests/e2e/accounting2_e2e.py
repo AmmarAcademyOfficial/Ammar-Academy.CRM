@@ -14,6 +14,7 @@ import subprocess
 import sys
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from playwright.sync_api import expect, sync_playwright
 import hydration  # noqa: F401  (waits for the page to be interactive after each load)
@@ -72,7 +73,7 @@ def academy_month(d: date):
     return date(start_y, start_m, 26), min(date(end_y, end_m, 25), d)
 
 
-today = (datetime.now(timezone.utc) + timedelta(hours=3)).date()
+today = datetime.now(ZoneInfo("Africa/Cairo")).date()
 a_from, a_to = academy_month(today)
 karim, hana = [sql("select id from public.profiles where full_name = $1", [n])[0]["id"] for n in ("Karim Fawzy", "Hana Farouk")]
 confirmed_sum = lambda extra="", params=None: float(sql(f"""

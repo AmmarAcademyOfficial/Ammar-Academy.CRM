@@ -5,14 +5,14 @@
  * Synthetic data only.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { admin, as, closeDb, createInquiry, createUser, expectError, type TestUser } from "./helpers";
+import { admin, as, closeDb, createInquiry, createUser, expectError, type TestUser, cairoDate } from "./helpers";
 
 let manager: TestUser, agent: TestUser, support1: TestUser, support2: TestUser, otherAgent: TestUser;
 let prog: string, course: string;
 const RECEIPT = { path: "receipts/11111111-2222-4333-8444-666666666666.jpg", name: "transfer.jpg", mime: "image/jpeg", size: 1234 };
 let refN = 0;
 const ref = () => `SPAY-${Date.now()}-${++refN}`;
-const cairoToday = () => new Date(Date.now() + 3 * 3600_000).toISOString().slice(0, 10);
+const cairoToday = () => cairoDate();
 const plusDays = (d: string, n: number) => new Date(Date.parse(d + "T00:00:00Z") + n * 86_400_000).toISOString().slice(0, 10);
 
 /** A sale of 10,000 EGP owned by `agent`, handed to support1 (onboarding created directly). */
@@ -77,7 +77,7 @@ describe("payment types", () => {
     const c = await customer();
     await pay(c.enrollment, 2500, agent, { kind: "deposit" });
     const [a] = await admin<{ body: string }>("select body from public.activities where inquiry_id = $1 and type = 'payment_submitted'", [c.inquiry]);
-    expect(a.body).toMatch(/^Payment submitted \(deposit\): 2,500 EGP · instapay · ref SPAY-/);
+    expect(a.body).toMatch(/^Payment submitted \(deposit\): SPay Course · 2,500 EGP · instapay · ref SPAY-/);
   });
 });
 

@@ -11,6 +11,7 @@ import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from playwright.sync_api import expect, sync_playwright
 import hydration  # noqa: F401  (waits for the page to be interactive after each load)
@@ -55,7 +56,7 @@ def sign_in(ctx, name, path):
     return page
 
 
-today = (datetime.now(timezone.utc) + timedelta(hours=3)).date()
+today = datetime.now(ZoneInfo("Africa/Cairo")).date()
 past = (today - timedelta(days=40)).isoformat()
 paid_on = (today - timedelta(days=39)).isoformat()
 due_on = (today + timedelta(days=20)).isoformat()

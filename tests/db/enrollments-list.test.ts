@@ -106,12 +106,12 @@ describe("the list", () => {
 });
 
 describe("who sees what", () => {
-  it("accountants see every enrollment but no phone numbers, and cannot search by phone", async () => {
+  it("accountants see every enrollment with phone numbers and can search by phone (Phase 1)", async () => {
     const l = await list(accountant);
     expect(l.total).toBe(4);
-    expect(l.rows.every((r) => r.phone === null)).toBe(true);
+    expect(l.rows.every((r) => r.phone?.startsWith("+"))).toBe(true);
     const phone = (await admin<{ phone_normalized: string }>("select c.phone_normalized from public.contacts c join public.inquiries i on i.contact_id = c.id where i.id = $1", [c.Paid.inquiry]))[0].phone_normalized;
-    expect((await list(accountant, { search: phone.slice(-6) })).total).toBe(0);
+    expect((await list(accountant, { search: phone.slice(-6) })).total).toBe(1);
     expect((await list(manager, { search: phone.slice(-6) })).total).toBe(1);
   });
 
