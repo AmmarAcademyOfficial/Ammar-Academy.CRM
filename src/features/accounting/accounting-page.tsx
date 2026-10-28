@@ -13,6 +13,7 @@ import { academyMonth, daysBetween, periodRange, PERIODS, shiftDay, sumByCurrenc
 import type { AccountingCustomer, AccountingData, AccountingPayment, MoneyTotal } from "@/domain/dto";
 import { cairoParts, formatMoney } from "@/domain/rules";
 import type { PaymentMethod, SubmissionStatus } from "@/domain/types";
+import { DeletedItemsView } from "@/features/deleted/deleted-items";
 import { SubmissionItem } from "@/features/lead-panel/payments-tab";
 import { formatDay } from "@/features/leads/filters";
 import { KIND_LABEL, METHOD_LABEL, courseOf } from "@/lib/courses";
@@ -24,7 +25,7 @@ import { ReviewView } from "./review-view";
 import { AuditSettings } from "@/features/settings/audit-settings";
 import { EnrollmentsView } from "@/features/customers/enrollments-view";
 
-type Tab = "overview" | "review" | "payments" | "customers" | "agents" | "teachers" | "audit";
+type Tab = "overview" | "review" | "payments" | "customers" | "agents" | "teachers" | "audit" | "deleted";
 const TABS: { id: Tab; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "review", label: "To review" },
@@ -33,6 +34,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "agents", label: "Sales agents" },
   { id: "teachers", label: "Teachers" },
   { id: "audit", label: "Audit history" },
+  { id: "deleted", label: "Deleted items" },
 ];
 
 interface Filters {
@@ -68,7 +70,7 @@ export function AccountingPage() {
   const [f, setF] = useState<Filters>(NO_FILTERS);
   const range = periodRange(period, today, custom);
   const valid = !!range.from && !!range.to && range.from <= range.to;
-  const teachersTab = tab === "teachers" || tab === "customers" || tab === "review" || tab === "audit";  // these tabs bring their own filters
+  const teachersTab = tab === "teachers" || tab === "customers" || tab === "review" || tab === "audit" || tab === "deleted";  // these tabs bring their own filters
   const { data, loading, error } = useApi<AccountingData>(valid && !teachersTab ? `/api/accounting?from=${range.from}&to=${range.to}` : null);
 
   const salesStaff = ref.profiles.filter((p) => p.role === "sales" || (p.role === "manager" && data?.customers.some((c) => c.salesAgentId === p.id)));
@@ -88,7 +90,7 @@ export function AccountingPage() {
 
   return (
     <div>
-      <PageHeader title="Accounting" subtitle={tab === "review" ? "What to check: new, additional and changed enrollments, and payments waiting for confirmation. Nothing waits for your review." : tab === "audit" ? "Every sensitive change and every download, who made it and when." : tab === "customers" ? "Every enrolled customer: agreed total, paid, balance and planned payments. Filters combine; currencies are never added together." : teachersTab ? "Teacher salaries per Academy month (26th to 25th), from the session hours support records. Currencies are never added together." : "Confirmed payments by the date the customer paid. Amounts in different currencies are never added together."} />
+      <PageHeader title="Accounting" subtitle={tab === "deleted" ? "Deleted records can be restored for 30 days, then they are removed for good." : tab === "review" ? "What to check: new, additional and changed enrollments, and payments waiting for confirmation. Nothing waits for your review." : tab === "audit" ? "Every sensitive change and every download, who made it and when." : tab === "customers" ? "Every enrolled customer: agreed total, paid, balance and planned payments. Filters combine; currencies are never added together." : teachersTab ? "Teacher salaries per Academy month (26th to 25th), from the session hours support records. Currencies are never added together." : "Confirmed payments by the date the customer paid. Amounts in different currencies are never added together."} />
 
       {!teachersTab && <Card className="mb-4 p-3">
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 [&>*]:min-w-0">
@@ -149,6 +151,7 @@ export function AccountingPage() {
       {tab === "teachers" && <TeachersView />}
       {tab === "review" && <ReviewView />}
       {tab === "audit" && <AuditSettings />}
+      {tab === "deleted" && <DeletedItemsView />}
       {tab === "customers" && <EnrollmentsView />}
       {!teachersTab && !valid && <Card className="p-4 text-sm text-bad">Choose a start date before the end date.</Card>}
       {!teachersTab && error && <Card className="p-4 text-sm text-bad">{error}</Card>}

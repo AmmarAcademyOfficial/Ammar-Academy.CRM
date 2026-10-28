@@ -271,6 +271,8 @@ export async function runTick(): Promise<TickResult> {
     let cleanup: TickResult["cleanup"] = null;
     if (new Date().getUTCMinutes() < 2) {
       try {
+        // Deleted records past their 30 days go first, so their receipts become unused and are removed too.
+        await asSystem((tx) => tx`select private.purge_deleted(now())`);
         cleanup = await cleanupOrphanReceipts();
       } catch (e) {
         console.error("[cleanup] receipts", (e as Error).message);
