@@ -192,7 +192,8 @@ export type ActivityType =
   | "payment_plan"
   | "teacher"
   | "session"
-  | "deleted";
+  | "deleted"
+  | "refund";
 
 export interface Activity {
   id: ID;
@@ -240,9 +241,37 @@ export interface Enrollment {
   addedAsExisting: boolean;
   /** Review by the accountant or a manager (never blocks anything). */
   review: { status: "to_review" | "reviewed" | "queried"; reason: string; byId: ID | null; at: Timestamp | null; note: string | null };
+  /** Plan 3: set when a refund ended the course (Withdraw). */
+  withdrawnAt: Timestamp | null;
 }
 
 export type PaymentMethod = "bank_transfer" | "instapay" | "mobile_wallet" | "cash" | "card" | "other";
+
+export type RefundReason = "withdrew" | "course_changed" | "overpaid" | "goodwill" | "other";
+export type RefundOutcome = "withdraw" | "keep";
+
+/** Plan 3: money paid back to a customer for one course, or a request for it. */
+export interface Refund {
+  id: ID;
+  enrollmentId: ID;
+  status: "requested" | "recorded" | "declined";
+  amount: number;
+  reason: RefundReason;
+  note?: string;
+  outcome?: RefundOutcome;
+  refundedOn?: string; // YYYY-MM-DD
+  method?: PaymentMethod;
+  reference?: string;
+  hasReceipt: boolean;
+  receiptName?: string;
+  requestedById?: ID;
+  requestedAt?: Timestamp;
+  recordedById?: ID;
+  recordedAt?: Timestamp;
+  declinedById?: ID;
+  declinedAt?: Timestamp;
+  declineReason?: string;
+}
 
 export interface PaymentSubmission {
   id: ID;
@@ -352,7 +381,7 @@ export interface PaymentDue {
   currency: string;
 }
 
-export type SupportStatus = "new_customer" | "onboarding" | "active";
+export type SupportStatus = "new_customer" | "onboarding" | "active" | "withdrawn";
 
 export interface ChecklistTemplateItem {
   id: ID;

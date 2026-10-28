@@ -137,6 +137,8 @@ describe("recording a refund", () => {
     expect(await listRow(manager, c.enrollment)).toMatchObject({ status: "withdrawn", paid: 0, refunded: 3000, balance: 0 });
     expect((await admin<{ status: string }>("select status from public.refunds where id = $1", [id]))[0].status).toBe("recorded");
     await expectError(pay(manager, c.enrollment, 100), "CRM01", "withdrew from this course");
+    const ob = (await admin<{ id: string }>("select id from public.onboardings where enrollment_id = $1", [c.enrollment]))[0].id;
+    await expectError(as(support, (q) => q("select public.set_onboarding_status($1, 'onboarding')", [ob])), "CRM01", "withdrew from the course");
     await expectError(request(support, { enrollment_id: c.enrollment, amount: 1, reason: "other", note: "x" }), "CRM01", "already withdrawn");
     expect((await notes(support, "Refund recorded: %withdrew")).length).toBeGreaterThan(0);
   });

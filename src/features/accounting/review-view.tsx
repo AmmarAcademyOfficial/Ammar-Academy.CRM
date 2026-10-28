@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Field, Textarea } from "@/components/ui/form";
 import { Card, CardHeader, EmptyState, Name, PhoneText, SkeletonRows } from "@/components/ui/misc";
 import { Dialog } from "@/components/ui/overlay";
-import type { ReviewQueue, ReviewQueueItem } from "@/domain/dto";
+import type { RefundRequestItem, ReviewQueue, ReviewQueueItem } from "@/domain/dto";
+import { DeclineRefundDialog, REFUND_REASON, RefundDialog } from "@/features/lead-panel/refunds";
 import { formatCairo, formatMoney } from "@/domain/rules";
 import { useRunAction } from "@/lib/run-action";
 import { useApi, useWorkspace } from "@/lib/workspace";
@@ -21,6 +22,9 @@ import { reviewEnrollment } from "@/server/payment-actions";
 export function ReviewView() {
   const { data, loading, error } = useApi<ReviewQueue>("/api/review-queue");
   const [querying, setQuerying] = useState<ReviewQueueItem | null>(null);
+  const [recording, setRecording] = useState<RefundRequestItem | null>(null);
+  const [declining, setDeclining] = useState<RefundRequestItem | null>(null);
+  const { openInquiry } = useWorkspace();
   const queried = data?.items.filter((i) => i.status === "queried") ?? [];
   const waiting = data?.items.filter((i) => i.status === "to_review") ?? [];
   return (
@@ -33,6 +37,34 @@ export function ReviewView() {
         </Card>
       )}
       {error && <Card className="p-4 text-sm text-bad">{error}</Card>}
+      {data && data.refundRequests.length > 0 && (
+        <Card>
+          <CardHeader title="Refund requests" subtitle="Support or sales asked for these. Record the refund once the money is paid back, or decline it with a reason." count={data.refundRequests.length} />
+          <ul className="divide-y divide-line" aria-label="Refund requests">
+            {data.refundRequests.map((r) => (
+              <li key={r.id} className="space-y-1.5 px-4 py-3 text-sm" data-refund-request={r.customerName}>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <button className="font-medium text-navy-900 hover:underline" onClick={() => openInquiry(r.inquiryId)}><Name>{r.customerName}</Name></button>
+                  <span className="text-muted">{r.courseName}</span>
+                  <span className="ml-auto font-semibold tabular-nums text-bad">−{formatMoney(r.amount, r.currency)}</span>
+                </div>
+                <p className="text-xs text-muted">{REFUND_REASON[r.reason]}{r.note ? <> · <span dir="auto">{r.note}</span></> : null} · paid {formatMoney(r.paid, r.currency)} of {formatMoney(r.agreed, r.currency)} · asked by {r.requestedBy ?? "—"} {formatCairo(r.requestedAt)}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  <Button size="sm" variant="navy" onClick={() => setRecording(r)} aria-label={`Record refund for ${r.customerName}`}>Record refund</Button>
+                  <Button size="sm" variant="danger" onClick={() => setDeclining(r)} aria-label={`Decline refund for ${r.customerName}`}>Decline</Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+      {recording && (
+        <RefundDialog enrollmentId={recording.enrollmentId} courseName={`${recording.customerName} · ${recording.courseName}`} currency={recording.currency}
+          paid={recording.paid} agreed={recording.agreed}
+          request={{ id: recording.id, enrollmentId: recording.enrollmentId, status: "requested", amount: recording.amount, reason: recording.reason, note: recording.note ?? undefined, hasReceipt: false }}
+          onClose={() => setRecording(null)} />
+      )}
+      {declining && <DeclineRefundDialog refundId={declining.id} onClose={() => setDeclining(null)} />}
       <Card>
         <CardHeader title="Enrollments to review" subtitle="New, additional and changed enrollments. Nothing waits for this: support already has the customer." count={waiting.length} />
         {!data && loading ? <SkeletonRows rows={4} /> : waiting.length === 0 ? (

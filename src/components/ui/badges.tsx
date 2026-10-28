@@ -131,6 +131,7 @@ const SUPPORT_LABEL: Record<SupportStatus, [string, string]> = {
   new_customer: ["bg-info-bg text-info", "New Customer"],
   onboarding: ["bg-warn-bg text-warn", "Onboarding"],
   active: ["bg-ok-bg text-ok", "Active"],
+  withdrawn: ["bg-[#eeeff3] text-[#4b4e66]", "Withdrawn"],
 };
 
 export function SupportStatusBadge({ status }: { status: SupportStatus }) {
@@ -142,6 +143,7 @@ export const SUPPORT_STATUS_LABEL: Record<SupportStatus, string> = {
   new_customer: "New Customer",
   onboarding: "Onboarding",
   active: "Active",
+  withdrawn: "Withdrawn",
 };
 
 /** Marks behavior that is simulated in the Phase 1 prototype. */

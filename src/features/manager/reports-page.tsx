@@ -103,7 +103,8 @@ export function ReportsPage() {
             <Stat label="First contact (median)" icon={<Clock size={14} />} value={fmtMinutes(data.firstContact.medianWorkingMinutes)}
               hint={`working time · ${pct(data.firstContact.withinTarget, data.firstContact.measured)} within ${data.firstContactTargetMinutes} min`} />
             <Stat label="Enrollments" icon={<GraduationCap size={14} />} value={data.enrollments} hint={data.additionalEnrollments ? `handed over to support · ${data.additionalEnrollments} additional (existing customers)` : "handed over to support"} tone={data.enrollments ? "ok" : undefined} />
-            <Stat label="Confirmed payments" icon={<Wallet size={14} />} value={<span className="text-xl">{money(data.confirmed)}</span>} hint={`${data.confirmed.reduce((t, c) => t + c.count, 0)} payments`} />
+            <Stat label="Confirmed payments" icon={<Wallet size={14} />} value={<span className="text-xl" data-testid="report-confirmed">{money(data.confirmed)}</span>}
+              hint={(data.refunds ?? []).length ? `${data.confirmed.reduce((t, c) => t + c.count, 0)} payments, net of ${money(data.refunds ?? [])} refunded${data.withdrawals ? ` · ${data.withdrawals} withdrew` : ""}` : `${data.confirmed.reduce((t, c) => t + c.count, 0)} payments`} />
             <Stat label="Lost" icon={<UserX size={14} />} value={data.lostTotal} hint="closed as Lost in range" />
           </div>
 
@@ -147,7 +148,7 @@ export function ReportsPage() {
                 </tbody>
               </table>
             </div>
-            <HowCounted className="px-4 pb-4" text="Assigned: inquiries whose current owner received them in the range (reassignments count for the new owner). Contacted: of those, how many have a recorded contact attempt — opening Call or WhatsApp alone does not count. First contact: from assignment to the first recorded attempt, counting only the agent's scheduled shift minutes and skipping leave days (agents with no shifts are measured in clock time). Now enrolled: of the inquiries assigned in the range, how many are Enrolled today. Enrollments and Confirmed payments: handovers and manager-confirmed payments in the range, credited to the agent who started the enrollment. Open now: open inquiries owned today, regardless of the range." />
+            <HowCounted className="px-4 pb-4" text="Assigned: inquiries whose current owner received them in the range (reassignments count for the new owner). Contacted: of those, how many have a recorded contact attempt — opening Call or WhatsApp alone does not count. First contact: from assignment to the first recorded attempt, counting only the agent's scheduled shift minutes and skipping leave days (agents with no shifts are measured in clock time). Now enrolled: of the inquiries assigned in the range, how many are Enrolled today. Enrollments and Confirmed payments: handovers and manager-confirmed payments in the range, minus refunds recorded in the range, credited to the agent who started the enrollment. Open now: open inquiries owned today, regardless of the range." />
           </Card>
 
           <Card>

@@ -6,7 +6,7 @@ import type { Activity, FieldValue, FollowUp, LeadFilters, Role, SavedView } fro
 import type { Staff } from "./auth";
 import { asUser, type Tx } from "./db";
 import { eligibilityRows, openReviewCount, sheetHealth } from "./import-queries";
-import { mapActivity, mapAudit, mapChecklistItem, mapCourse, mapCourseType, mapEnrollment, mapField, mapFollowUp, mapLeadRow, mapNotification, mapOnboarding, mapOutcome, mapPayment, mapPaymentDue, mapProfile, mapSession, mapTeacher, mapTeacherAssignment, mapProgram, mapSettings, mapStage, mapSupportFollowUp, mapTag } from "./mappers";
+import { mapActivity, mapAudit, mapChecklistItem, mapCourse, mapCourseType, mapEnrollment, mapField, mapFollowUp, mapLeadRow, mapNotification, mapOnboarding, mapOutcome, mapPayment, mapPaymentDue, mapProfile, mapSession, mapTeacher, mapTeacherAssignment, mapProgram, mapRefund, mapSettings, mapStage, mapSupportFollowUp, mapTag } from "./mappers";
 import { withDefaults } from "@/domain/filters";
 
 type Frag = postgres.Fragment;
@@ -229,17 +229,19 @@ export async function getLeadDetail(staff: Staff, id: string): Promise<LeadDetai
     // Every enrollment of this customer (Phase 1), oldest first; the single fields hold the first.
     for (const er of enr) {
       const e = mapEnrollment(er);
-      const [pays, onb, dues, teach, sess] = await Promise.all([
+      const [pays, onb, dues, teach, sess, refs] = await Promise.all([
         tx<Row[]>`select * from public.payments where enrollment_id = ${e.id} order by submitted_at desc`,
         tx<Row[]>`select * from public.onboardings where enrollment_id = ${e.id}`,
         tx<Row[]>`select * from public.payment_dues_view(${e.id})`,
         tx<Row[]>`select * from public.teacher_assignments where enrollment_id = ${e.id} order by ended_on nulls first, started_on desc`,
         tx<Row[]>`select s.*, a.subject from public.teacher_sessions s join public.teacher_assignments a on a.id = s.assignment_id where s.enrollment_id = ${e.id} order by s.starts_at`,
+        tx<Row[]>`select * from public.refunds where enrollment_id = ${e.id} order by coalesce(recorded_at, requested_at, created_at) desc`,
       ]);
       const payments = pays.map(mapPayment);
+      const refunds = refs.map(mapRefund);
       const bundle: EnrollmentBundle = {
-        enrollment: e, payments, totals: totalsOf(e.agreedTotal, payments), dues: dues.map(mapPaymentDue),
-        teachers: teach.map(mapTeacherAssignment), sessions: sess.map(mapSession), supportFollowUps: [],
+        enrollment: e, payments, totals: totalsOf(e.agreedTotal, payments, refunds, !!e.withdrawnAt), dues: dues.map(mapPaymentDue),
+        teachers: teach.map(mapTeacherAssignment), sessions: sess.map(mapSession), supportFollowUps: [], refunds,
       };
       if (onb[0]) {
         const [items, sfus] = await Promise.all([
@@ -262,11 +264,12 @@ export async function getLeadDetail(staff: Staff, id: string): Promise<LeadDetai
   });
 }
 
-/** Only confirmed payments count; pending is shown separately. */
-export function totalsOf(agreed: number, payments: { amount: number; status: string }[]) {
-  const paid = payments.filter((p) => p.status === "confirmed").reduce((t, p) => t + p.amount, 0);
+/** Only confirmed payments count, minus recorded refunds; pending is shown separately. A withdrawn customer owes nothing more. */
+export function totalsOf(agreed: number, payments: { amount: number; status: string }[], refunds: { amount: number; status: string }[] = [], withdrawn = false) {
+  const refunded = refunds.filter((r) => r.status === "recorded").reduce((t, r) => t + r.amount, 0);
+  const paid = payments.filter((p) => p.status === "confirmed").reduce((t, p) => t + p.amount, 0) - refunded;
   const pending = payments.filter((p) => p.status === "pending").reduce((t, p) => t + p.amount, 0);
-  return { agreed, paid, pending, balance: Math.max(agreed - paid, 0) };
+  return { agreed, paid, pending, balance: withdrawn ? 0 : Math.max(agreed - paid, 0), refunded };
 }
 
 // ── My Work ──────────────────────────────────────────────────────────────

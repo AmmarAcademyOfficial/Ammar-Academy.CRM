@@ -19,6 +19,7 @@ function normalize(r: ReportData): ReportData {
   return {
     ...r,
     confirmed: r.confirmed.map((c) => ({ ...c, amount: Number(c.amount) })),
+    refunds: (r.refunds ?? []).map((c) => ({ ...c, amount: Number(c.amount) })),
     agents: r.agents.map((a) => ({ ...a, confirmed: money(a.confirmed), medianWorkingMinutes: a.medianWorkingMinutes == null ? null : Number(a.medianWorkingMinutes) })),
     courses: r.courses.map((c) => ({ ...c, price: c.price == null ? null : Number(c.price), confirmed: money(c.confirmed) })),
     courseTypes: r.courseTypes.map((c) => ({ ...c, confirmed: money(c.confirmed) })),

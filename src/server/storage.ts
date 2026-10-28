@@ -97,6 +97,7 @@ export async function cleanupOrphanReceipts(now = Date.now()): Promise<{ checked
   const linked = new Set(
     // Receipts of deleted payments stay until the deleted record is removed for good (30 days), so a restore keeps them.
     (await asSystem((tx) => tx<{ p: string }[]>`select receipt_path as p from public.payments where receipt_path is not null
+                                               union select receipt_path from public.refunds where receipt_path is not null
                                                union select private.deleted_receipts()`)).map((r) => r.p),
   );
   let checked = 0;

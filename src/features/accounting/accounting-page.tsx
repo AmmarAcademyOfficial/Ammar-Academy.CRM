@@ -1,20 +1,21 @@
 "use client";
 
-import { AlertTriangle, Banknote, Clock, Download, Paperclip, Receipt, Search, Wallet } from "lucide-react";
+import { AlertTriangle, Banknote, Clock, Download, HandCoins, Paperclip, Receipt, Search, Wallet } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
-import { SubmissionBadge } from "@/components/ui/badges";
+import { Pill, SubmissionBadge } from "@/components/ui/badges";
 import { Button } from "@/components/ui/button";
 import { cn as clsx } from "@/components/ui/cn";
 import { Input, Select } from "@/components/ui/form";
 import { Card, CardHeader, EmptyState, Name, PageHeader, SkeletonRows, Stat } from "@/components/ui/misc";
 import { Dialog } from "@/components/ui/overlay";
 import { academyMonth, daysBetween, periodRange, PERIODS, shiftDay, sumByCurrency, type Period } from "@/domain/accounting";
-import type { AccountingCustomer, AccountingData, AccountingPayment, MoneyTotal } from "@/domain/dto";
+import type { AccountingCustomer, AccountingData, AccountingPayment, AccountingRefund, MoneyTotal } from "@/domain/dto";
 import { cairoParts, formatMoney } from "@/domain/rules";
 import type { PaymentMethod, SubmissionStatus } from "@/domain/types";
 import { DeletedItemsView } from "@/features/deleted/deleted-items";
 import { SubmissionItem } from "@/features/lead-panel/payments-tab";
+import { REFUND_REASON } from "@/features/lead-panel/refunds";
 import { formatDay } from "@/features/leads/filters";
 import { KIND_LABEL, METHOD_LABEL, courseOf } from "@/lib/courses";
 import { toCsv } from "@/lib/csv";
@@ -85,6 +86,7 @@ export function AccountingPage() {
     (!f.supportAgentId || x.supportOwnerId === f.supportAgentId);
   const payments = useMemo(() => (data?.payments ?? []).filter((p) => matchCommon(p) && (!f.method || p.payment.method === f.method)), [data, f]); // eslint-disable-line react-hooks/exhaustive-deps
   const customers = useMemo(() => (data?.customers ?? []).filter(matchCommon), [data, f]); // eslint-disable-line react-hooks/exhaustive-deps
+  const refunds = useMemo(() => (data?.refunds ?? []).filter((r) => matchCommon(r) && (!f.method || r.method === f.method)), [data, f]); // eslint-disable-line react-hooks/exhaustive-deps
   const academy = academyMonth(today);
   const activeFilters = Object.values(f).filter(Boolean).length;
 
@@ -156,21 +158,22 @@ export function AccountingPage() {
       {!teachersTab && !valid && <Card className="p-4 text-sm text-bad">Choose a start date before the end date.</Card>}
       {!teachersTab && error && <Card className="p-4 text-sm text-bad">{error}</Card>}
       {!teachersTab && valid && !data && loading && <Card><SkeletonRows rows={5} /></Card>}
-      {data && tab === "overview" && <Overview payments={payments} customers={customers} range={range} />}
-      {data && tab === "payments" && <PaymentsView payments={payments} range={range} />}
-      
-      {data && tab === "agents" && <AgentsView payments={payments} customers={customers} range={range} />}
+      {data && tab === "overview" && <Overview payments={payments} customers={customers} refunds={refunds} range={range} />}
+      {data && tab === "payments" && <PaymentsView payments={payments} refunds={refunds} range={range} />}
+      {data && tab === "agents" && <AgentsView payments={payments} customers={customers} refunds={refunds} range={range} />}
     </div>
   );
 }
 
 // ── Overview ─────────────────────────────────────────────────────────────
 
-function Overview({ payments, customers, range }: { payments: AccountingPayment[]; customers: AccountingCustomer[]; range: { from: string; to: string } }) {
+function Overview({ payments, customers, refunds, range }: { payments: AccountingPayment[]; customers: AccountingCustomer[]; refunds: AccountingRefund[]; range: { from: string; to: string } }) {
   const { ref } = useWorkspace();
   const confirmed = payments.filter((p) => p.payment.status === "confirmed");
   const pending = payments.filter((p) => p.payment.status === "pending");
   const moneyIn = sumByCurrency(confirmed.map((p) => ({ amount: p.payment.amount, currency: p.currency })));
+  const moneyOut = sumByCurrency(refunds.map((r) => ({ amount: r.amount, currency: r.currency })));
+  const net = sumByCurrency([...confirmed.map((p) => ({ amount: p.payment.amount, currency: p.currency })), ...refunds.map((r) => ({ amount: -r.amount, currency: r.currency }))]);
   const owed = sumByCurrency(customers.map((c) => ({ amount: c.balance, currency: c.currency })));
   const overdueCustomers = customers.filter((c) => c.overdueLeft > 0);
   const overdue = sumByCurrency(overdueCustomers.map((c) => ({ amount: c.overdueLeft, currency: c.currency })));
@@ -186,8 +189,10 @@ function Overview({ payments, customers, range }: { payments: AccountingPayment[
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <Stat label="Money in (confirmed)" value={<span data-testid="money-in">{moneyList(moneyIn)}</span>} hint={`${confirmed.length} payment${confirmed.length === 1 ? "" : "s"} · ${formatDay(range.from)} – ${formatDay(range.to)}`} icon={<Banknote size={14} />} tone="ok" />
+        <Stat label="Refunds (money out)" value={<span data-testid="refunds-out">{moneyList(moneyOut)}</span>} hint={`${refunds.length} refund${refunds.length === 1 ? "" : "s"} paid back in this period`} icon={<HandCoins size={14} />} tone={refunds.length ? "bad" : "default"} />
+        <Stat label="Net money in" value={<span data-testid="net-in">{moneyList(net)}</span>} hint="Confirmed payments minus refunds" icon={<Banknote size={14} />} tone="ok" />
         <Stat label="Waiting for review" value={moneyList(sumByCurrency(pending.map((p) => ({ amount: p.payment.amount, currency: p.currency }))))} hint={`${pending.length} payment${pending.length === 1 ? "" : "s"}, not counted yet`} icon={<Clock size={14} />} tone={pending.length ? "warn" : "default"} />
         <Stat label="Still owed by customers" value={<span data-testid="still-owed">{moneyList(owed)}</span>} hint={`${customers.filter((c) => c.balance > 0).length} customers with a balance (today)`} icon={<Wallet size={14} />} />
         <Stat label="Overdue planned payments" value={<span data-testid="overdue">{moneyList(overdue)}</span>} hint={`${overdueCustomers.length} customer${overdueCustomers.length === 1 ? "" : "s"} (today)`} icon={<AlertTriangle size={14} />} tone={overdueCustomers.length ? "bad" : "default"} />
@@ -287,7 +292,7 @@ const STATUS_OPTIONS: { id: "all" | SubmissionStatus; label: string }[] = [
   { id: "all", label: "All statuses" },
 ];
 
-function PaymentsView({ payments, range }: { payments: AccountingPayment[]; range: { from: string; to: string } }) {
+function PaymentsView({ payments, refunds, range }: { payments: AccountingPayment[]; refunds: AccountingRefund[]; range: { from: string; to: string } }) {
   const { ref, me } = useWorkspace();
   const [status, setStatus] = useState<"all" | SubmissionStatus>("confirmed");
   const [q, setQ] = useState("");
@@ -377,6 +382,38 @@ function PaymentsView({ payments, range }: { payments: AccountingPayment[]; rang
         )}
       </Card>
 
+      <Card>
+        <CardHeader title="Refunds" count={refunds.length} subtitle={`Money paid back to customers ${formatDay(range.from)} – ${formatDay(range.to)}${refunds.length ? ` · ${moneyList(sumByCurrency(refunds.map((r) => ({ amount: r.amount, currency: r.currency }))))}` : ""}`} />
+        {refunds.length === 0 ? <p className="px-4 py-6 text-sm text-muted">No refunds in this period.</p> : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[760px] text-sm" aria-label="Refunds">
+              <thead><tr className="text-left text-xs text-muted">
+                <th className="px-4 py-2 font-medium">Paid back on</th><th className="px-4 py-2 font-medium">Customer</th><th className="px-4 py-2 font-medium">Course</th>
+                <th className="px-4 py-2 font-medium">Reason</th><th className="px-4 py-2 font-medium">Method</th><th className="px-4 py-2 text-right font-medium">Amount</th>
+                <th className="px-4 py-2 font-medium">Course after</th><th className="px-4 py-2 font-medium">Recorded by</th><th className="px-4 py-2"><span className="sr-only">Receipt</span></th>
+              </tr></thead>
+              <tbody className="divide-y divide-line">
+                {refunds.map((r) => (
+                  <tr key={r.id} data-refund-row={r.customerName}>
+                    <td className="whitespace-nowrap px-4 py-2">{formatDay(r.refundedOn)}</td>
+                    <td className="px-4 py-2 font-medium"><Name>{r.customerName}</Name></td>
+                    <td className="px-4 py-2 text-muted">{courseOf(ref, r.courseId)?.name ?? "—"}</td>
+                    <td className="px-4 py-2"><Pill className="bg-bad-bg text-bad">Refund</Pill> <span className="text-muted">{REFUND_REASON[r.reason]}</span></td>
+                    <td className="px-4 py-2 text-muted">{METHOD_LABEL[r.method]}</td>
+                    <td className="whitespace-nowrap px-4 py-2 text-right font-semibold tabular-nums text-bad">−{formatMoney(r.amount, r.currency)}</td>
+                    <td className="px-4 py-2">{r.outcome === "withdraw" ? "Withdrew" : "Keeps studying"}</td>
+                    <td className="px-4 py-2 text-muted">{profileName(ref, r.recordedBy)}</td>
+                    <td className="px-4 py-2">
+                      {r.hasReceipt && <a href={`/api/refund-receipts/${r.id}`} target="_blank" rel="noreferrer" aria-label={`Refund receipt for ${r.customerName}`} className="inline-flex text-navy-700 hover:text-navy-900"><Paperclip size={15} /></a>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
       {open && (
         <Dialog open onClose={() => setOpen(null)} title={`Payment · ${open.customerName}`} description={`${courseOf(ref, open.courseId)?.name ?? "—"}${open.salesAgentId ? ` · sold by ${profileName(ref, open.salesAgentId)}` : ""}`}
           footer={<Button onClick={() => setOpen(null)}>Close</Button>}>
@@ -390,7 +427,7 @@ function PaymentsView({ payments, range }: { payments: AccountingPayment[]; rang
 
 // ── Sales agents ─────────────────────────────────────────────────────────
 
-function AgentsView({ payments, customers, range }: { payments: AccountingPayment[]; customers: AccountingCustomer[]; range: { from: string; to: string } }) {
+function AgentsView({ payments, customers, refunds, range }: { payments: AccountingPayment[]; customers: AccountingCustomer[]; refunds: AccountingRefund[]; range: { from: string; to: string } }) {
   const { ref } = useWorkspace();
   const confirmed = payments.filter((p) => p.payment.status === "confirmed");
   const agentIds = [...new Set([...confirmed.map((p) => p.salesAgentId), ...customers.filter((c) => c.enrolledAt.slice(0, 10) >= range.from).map((c) => c.salesAgentId)].filter((x): x is string => !!x))];
@@ -400,10 +437,13 @@ function AgentsView({ payments, customers, range }: { payments: AccountingPaymen
   };
   const rows = agentIds.map((id) => {
     const mine = confirmed.filter((p) => p.salesAgentId === id);
+    const back = refunds.filter((r) => r.salesAgentId === id);
     return {
       id,
       name: profileName(ref, id),
-      total: sumByCurrency(mine.map((p) => ({ amount: p.payment.amount, currency: p.currency }))),
+      // Money the Academy kept: confirmed payments minus refunds of the agent's sales.
+      total: sumByCurrency([...mine.map((p) => ({ amount: p.payment.amount, currency: p.currency })), ...back.map((r) => ({ amount: -r.amount, currency: r.currency }))]),
+      refunded: sumByCurrency(back.map((r) => ({ amount: r.amount, currency: r.currency }))),
       count: mine.length,
       deposits: mine.filter((p) => p.payment.kind === "deposit" || p.payment.kind === "full").length,
       enrollments: customers.filter((c) => c.salesAgentId === id && inRange(c.enrolledAt)).length,
@@ -416,8 +456,8 @@ function AgentsView({ payments, customers, range }: { payments: AccountingPaymen
   const activeDays = days.filter((d) => confirmed.some((p) => p.payment.paidOn === d));
 
   const exportCsv = () => download(`sales-agents-${range.from}-to-${range.to}.csv`, [
-    ["Sales agent", "Confirmed payments", "Number of payments", "New enrollments", "Still owed by their customers (today)"],
-    ...rows.map((r) => [r.name, csvMoney(r.total), r.count, r.enrollments, csvMoney(r.owed)]),
+    ["Sales agent", "Confirmed payments net of refunds", "Refunded", "Number of payments", "New enrollments", "Still owed by their customers (today)"],
+    ...rows.map((r) => [r.name, csvMoney(r.total), csvMoney(r.refunded), r.count, r.enrollments, csvMoney(r.owed)]),
     [],
     ["Day", ...rows.map((r) => r.name)],
     ...activeDays.map((d) => [d, ...rows.map((r) => csvMoney(cell(r.id, d)))]),
@@ -426,13 +466,13 @@ function AgentsView({ payments, customers, range }: { payments: AccountingPaymen
   return (
     <div className="space-y-5">
       <Card>
-        <CardHeader title="Sales agents" count={rows.length} subtitle={`Confirmed payments ${formatDay(range.from)} – ${formatDay(range.to)}, credited to the agent who made the sale (later installments included)`}
+        <CardHeader title="Sales agents" count={rows.length} subtitle={`Confirmed payments ${formatDay(range.from)} – ${formatDay(range.to)} minus refunds, credited to the agent who made the sale (later installments included)`}
           action={<Button size="sm" icon={<Download size={14} />} onClick={exportCsv} disabled={!rows.length}>Download CSV</Button>} />
         {rows.length === 0 ? <EmptyState icon={<Banknote size={20} />} title="No confirmed payments">No sales in this period with these filters.</EmptyState> : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] text-sm" aria-label="Sales agents">
               <thead><tr className="text-left text-xs text-muted">
-                <th className="px-4 py-2 font-medium">Sales agent</th><th className="px-4 py-2 text-right font-medium">Confirmed</th><th className="px-4 py-2 text-right font-medium">Payments</th>
+                <th className="px-4 py-2 font-medium">Sales agent</th><th className="px-4 py-2 text-right font-medium">Confirmed, net of refunds</th><th className="px-4 py-2 text-right font-medium">Refunded</th><th className="px-4 py-2 text-right font-medium">Payments</th>
                 <th className="px-4 py-2 text-right font-medium">New enrollments</th><th className="px-4 py-2 text-right font-medium">Still owed (today)</th>
               </tr></thead>
               <tbody className="divide-y divide-line">
@@ -440,6 +480,7 @@ function AgentsView({ payments, customers, range }: { payments: AccountingPaymen
                   <tr key={r.id} data-agent={r.name}>
                     <td className="px-4 py-2 font-medium">{r.name}</td>
                     <td className="whitespace-nowrap px-4 py-2 text-right font-semibold tabular-nums">{moneyList(r.total)}</td>
+                    <td className="whitespace-nowrap px-4 py-2 text-right tabular-nums text-muted">{r.refunded.length ? moneyList(r.refunded) : "—"}</td>
                     <td className="px-4 py-2 text-right tabular-nums">{r.count}</td>
                     <td className="px-4 py-2 text-right tabular-nums">{r.enrollments}</td>
                     <td className="whitespace-nowrap px-4 py-2 text-right tabular-nums text-muted">{moneyList(r.owed)}</td>

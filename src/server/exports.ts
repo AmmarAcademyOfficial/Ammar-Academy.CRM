@@ -96,9 +96,9 @@ export async function describeLeadFilters(tx: Tx, f: LeadFilters): Promise<strin
 }
 
 const STATUS_LABEL: Record<string, string> = {
-  not_handed_over: "Not handed over yet", new_customer: "New customer", onboarding: "Onboarding", active: "Active", flagged: "Flagged for review",
+  not_handed_over: "Not handed over yet", new_customer: "New customer", onboarding: "Onboarding", active: "Active", flagged: "Flagged for review", withdrawn: "Withdrawn",
 };
-const PAYMENT_STATE: Record<string, string> = { paid: "fully paid", balance: "balance left", overdue: "overdue", pending: "waiting for review", none: "no payment yet" };
+const PAYMENT_STATE: Record<string, string> = { paid: "fully paid", balance: "balance left", overdue: "overdue", pending: "waiting for review", none: "no payment yet", refunded: "refunded" };
 
 export async function describeEnrollmentFilters(tx: Tx, f: EnrollmentFilters): Promise<string> {
   const names = await namesFor(tx, [...f.programIds, ...f.courseTypeIds, ...f.courseIds, ...f.teacherIds, ...f.salesAgentIds, ...f.supportOwnerIds]);
@@ -191,9 +191,9 @@ export async function leadsWorkbook(staff: Staff, q: Pick<LeadQuery, "filters" |
 
 // ── Enrollments, payments and the payment plan ───────────────────────────
 
-const KIND: Record<string, string> = { deposit: "Deposit", installment: "Installment", full: "Full payment" };
+const KIND: Record<string, string> = { deposit: "Deposit", installment: "Installment", full: "Full payment", refund: "Refund" };
 const METHOD: Record<string, string> = { bank_transfer: "Bank transfer", instapay: "InstaPay", mobile_wallet: "Mobile wallet", cash: "Cash", card: "Card", other: "Other" };
-const PAY_STATUS: Record<string, string> = { pending: "Waiting for review", confirmed: "Confirmed", rejected: "Rejected", reversed: "Reversed" };
+const PAY_STATUS: Record<string, string> = { pending: "Waiting for review", confirmed: "Confirmed", rejected: "Rejected", reversed: "Reversed", refunded: "Refunded" };
 const DUE_STATUS: Record<string, string> = { paid: "Paid", overdue: "Overdue", due_today: "Due today", partly_paid: "Partly paid", upcoming: "Upcoming" };
 
 interface ExportPayment {
@@ -225,7 +225,7 @@ export async function enrollmentsWorkbook(staff: Staff, q: EnrollmentExportQuery
         { header: "Enrolled on", type: "date" }, { header: "Course starts", type: "date" }, { header: "Sales agent", type: "text" },
         { header: "Support owner", type: "text" }, { header: "Teacher", type: "text" }, { header: "Support status", type: "text" },
         { header: "Currency", type: "text", width: 9 }, { header: "Agreed total", type: "money" }, { header: "Paid", type: "money" },
-        { header: "Waiting for review", type: "money" }, { header: "Balance", type: "money" }, { header: "Last payment", type: "date" },
+        { header: "Waiting for review", type: "money" }, { header: "Balance", type: "money" }, { header: "Refunded", type: "money" }, { header: "Last payment", type: "date" },
         { header: "Next due date", type: "date" }, { header: "Next due amount", type: "money" }, { header: "Overdue", type: "money" },
         { header: "Package hours", type: "number", width: 10 }, { header: "Hours used", type: "number", width: 10 }, { header: "Hours left", type: "number", width: 10 },
         { header: "Added as existing customer", type: "text", width: 12 },
@@ -233,13 +233,13 @@ export async function enrollmentsWorkbook(staff: Staff, q: EnrollmentExportQuery
       rows: r.rows.map((x) => [
         x.customerName, ...ph([x.phone]), x.studentName, x.programName, x.courseTypeName, x.courseName, x.enrolledOn ?? x.enrolledAt, x.courseStart,
         x.salesAgentName ?? "Before the CRM", x.supportOwnerName, x.teacherNames, STATUS_LABEL[x.status] ?? x.status, x.currency,
-        x.agreed, x.paid, x.pending, x.balance, x.lastPaidOn, x.nextDueOn, x.nextDueLeft, x.overdueLeft,
+        x.agreed, x.paid, x.pending, x.balance, x.refunded, x.lastPaidOn, x.nextDueOn, x.nextDueLeft, x.overdueLeft,
         x.packageHours, x.packageHours != null ? x.packageUsed : null, x.packageHours != null ? Math.max(x.packageHours - (x.packageUsed ?? 0), 0) : null,
         x.addedAsExisting ? "Yes" : "No",
       ]),
     };
     const cur = phones ? 12 : 11;
-    enrollments.totals = { label: (c) => `Total ${c}`, currencyColumn: cur, sumColumns: [cur + 1, cur + 2, cur + 3, cur + 4, cur + 8] };
+    enrollments.totals = { label: (c) => `Total ${c}`, currencyColumn: cur, sumColumns: [cur + 1, cur + 2, cur + 3, cur + 4, cur + 5, cur + 9] };
 
     const payments: Sheet = {
       name: "Payments",
@@ -257,9 +257,9 @@ export async function enrollmentsWorkbook(staff: Staff, q: EnrollmentExportQuery
         x.salesAgentName ?? "Before the CRM",
       ]),
     };
-    // Totals count confirmed payments only, so they match "Paid" on the Enrollments sheet.
+    // Totals count confirmed payments minus refunds (refund rows are negative), so they match "Paid" on the Enrollments sheet.
     const pc = phones ? 1 : 0;
-    payments.totals = { label: (c) => `Total confirmed ${c}`, currencyColumn: 5 + pc, sumColumns: [4 + pc], where: { column: 9 + pc, equals: PAY_STATUS.confirmed } };
+    payments.totals = { label: (c) => `Total confirmed, net of refunds ${c}`, currencyColumn: 5 + pc, sumColumns: [4 + pc], where: { column: 9 + pc, equals: [PAY_STATUS.confirmed, PAY_STATUS.refunded] } };
 
     const plan: Sheet = {
       name: "Payment plan",

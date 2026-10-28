@@ -422,13 +422,15 @@ begin
   return v_id;
 end $$;
 
+-- A new column (withdrawn) changes the result type, so the function is replaced.
+drop function if exists public.accounting_customers();
 create or replace function public.accounting_customers()
 returns table (
   enrollment_id uuid, inquiry_id uuid, customer_name text, student_name text,
   program_id uuid, course_id uuid, course_type_id uuid, currency text,
   agreed_total numeric, paid numeric, pending numeric, enrolled_at timestamptz, handed_over_at timestamptz,
   sales_agent_id uuid, support_owner_id uuid,
-  next_due_on date, next_due_left numeric, next_due_status text, overdue_left numeric, overdue_since date)
+  next_due_on date, next_due_left numeric, next_due_status text, overdue_left numeric, overdue_since date, withdrawn boolean)
 language plpgsql stable security definer set search_path = '' as $$
 begin
   perform private.require_finance();
@@ -446,7 +448,8 @@ begin
            e.original_sales_owner_id, o.support_owner_id,
            nd.due_on, nd.amount - nd.covered, nd.status,
            coalesce((select sum(d.amount - d.covered) from dues d where d.enrollment_id = e.id and d.status = 'overdue'), 0),
-           (select min(d.due_on) from dues d where d.enrollment_id = e.id and d.status = 'overdue')
+           (select min(d.due_on) from dues d where d.enrollment_id = e.id and d.status = 'overdue'),
+           e.withdrawn_at is not null
       from public.enrollments e
       join public.inquiries i on i.id = e.inquiry_id
       join public.contacts c on c.id = i.contact_id
@@ -456,6 +459,11 @@ begin
       left join lateral (select d.* from dues d where d.enrollment_id = e.id and d.status <> 'paid' order by d.due_on limit 1) nd on true
      order by c.name;
 end $$;
+
+
+
+revoke all on function public.accounting_customers() from public, anon;
+grant execute on function public.accounting_customers() to authenticated;
 
 create or replace function public.enrollments_list(p jsonb)
 returns jsonb language plpgsql volatile security definer set search_path = '' as $$
@@ -844,6 +852,36 @@ begin
          order by e.reviewed_at desc limit 30) r), '[]'));
 end $$;
 
+create or replace function public.set_onboarding_status(p_onboarding uuid, p_status public.support_status)
+returns void language plpgsql security definer set search_path = '' as $$
+declare
+  o public.onboardings;
+  v_open text[];
+  v_inquiry uuid;
+begin
+  perform private.require_role('manager', 'support');
+  if not private.can_work_onboarding(p_onboarding) then
+    raise exception using errcode = 'CRM03', message = 'Only the support owner can change the status.';
+  end if;
+  select * into o from public.onboardings where id = p_onboarding for update;
+  if o.status = p_status then return; end if;
+  -- Withdrawn is set by a refund only, and ends the course.
+  if o.status::text = 'withdrawn' or p_status::text = 'withdrawn' then
+    perform private.fail('This customer withdrew from the course after a refund, so the status cannot change.');
+  end if;
+  if p_status = 'active' then
+    select coalesce(array_agg(label order by sort), '{}') into v_open from public.onboarding_items where onboarding_id = o.id and done_at is null;
+    if cardinality(v_open) > 0 then
+      perform private.fail('Finish the onboarding checklist first.', to_jsonb(v_open)::text);
+    end if;
+    if o.flagged_reason is not null then perform private.fail('This customer is flagged for review. A manager must resolve it first.'); end if;
+  end if;
+  update public.onboardings set status = p_status, activated_at = case when p_status = 'active' then now() else activated_at end, version = version + 1
+  where id = o.id;
+  select inquiry_id into v_inquiry from public.enrollments where id = o.enrollment_id;
+  perform private.log_activity(v_inquiry, 'support_status', 'Support status: ' || replace(initcap(replace(p_status::text, '_', ' ')), 'Customer', 'customer'));
+end $$;
+
 create or replace function private.notification_kind(p_text text)
 returns text language sql immutable set search_path = '' as $$
   select case
@@ -987,6 +1025,14 @@ begin
     jsonb_build_object('deleted_record_id', v_rec, 'kind', v_kind, 'record_id', v_id, 'summary', v ->> 'summary', 'confirmed', v -> 'confirmed'));
   return jsonb_build_object('id', v_rec, 'summary', v ->> 'summary', 'flagged', v_flagged);
 end $$;
+
+-- Receipts of payments and refunds in deleted records stay on file until the record is removed for good.
+create or replace function private.deleted_receipts()
+returns setof text language sql stable security definer set search_path = '' as $$
+  select x ->> 'receipt_path' from public.deleted_records r,
+         jsonb_array_elements(coalesce(r.data -> 'payments', '[]') || coalesce(r.data -> 'refunds', '[]')) x
+   where x ->> 'receipt_path' is not null
+$$;
 
 revoke all on function private.refunded(uuid), private.refund_reason_text(text) from public, anon, authenticated;
 revoke all on function public.request_refund(jsonb), public.record_refund(jsonb), public.decline_refund(uuid, text), public.accounting_refunds(date, date) from public, anon;

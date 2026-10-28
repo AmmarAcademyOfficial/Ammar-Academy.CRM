@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarRange, Check, ClipboardCheck, GraduationCap, Info, Loader2, MessageSquareWarning, Paperclip, Pencil, Plus, Split, Trash2, Undo2, Upload, X } from "lucide-react";
+import { CalendarRange, Check, HandCoins, ClipboardCheck, GraduationCap, Info, Loader2, MessageSquareWarning, Paperclip, Pencil, Plus, Split, Trash2, Undo2, Upload, X } from "lucide-react";
 import { useRef, useState } from "react";
 import { DueBadge, PaymentBadge, Pill, SubmissionBadge } from "@/components/ui/badges";
 import { Button, IconButton } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import { profileName, type LeadRow } from "@/lib/lead-row";
 import { useRunAction } from "@/lib/run-action";
 import { useWorkspace } from "@/lib/workspace";
 import { DeleteDialog } from "@/features/deleted/delete-dialog";
+import { DeclineRefundDialog, REFUND_REASON, RefundBadge, RefundDialog, RefundsList, RequestRefundDialog } from "./refunds";
 import { decidePayment, deletePaymentDue, reversePayment, reviewEnrollment, saveEnrollment, savePaymentDue, submitPayment, submitSplitPayment } from "@/server/payment-actions";
 
 const HANDOVER_TEXT = {
@@ -106,12 +107,17 @@ function EnrollmentCard({ b, row, several, canWork, canPay, canPlan, onEdit }: {
   const { ref, me } = useWorkspace();
   const [paying, setPaying] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [refunding, setRefunding] = useState(false);
+  const [declining, setDeclining] = useState(false);
   const [dueEdit, setDueEdit] = useState<PaymentDue | "new" | null>(null);
   const e = b.enrollment;
   const t = b.totals;
   const course = courseOf(ref, e.courseId);
   const program = ref.programs.find((p) => p.id === course?.programId);
   const status: PaymentStatus = t.paid <= 0 ? "unpaid" : t.paid >= t.agreed ? "fully_paid" : "partially_paid";
+  const withdrawn = !!e.withdrawnAt;
+  const finance = me.role === "manager" || me.role === "accountant";
+  const openRequest = b.refunds.find((r) => r.status === "requested");
   const check = handoverCheck(ref.settings, course?.programId ?? row.program.id, { paid: t.paid + t.pending }, t.agreed);
   const pct = Math.min(100, Math.round((t.paid / t.agreed) * 100));
   const hasConfirmed = b.payments.some((p) => p.status === "confirmed");
@@ -128,19 +134,24 @@ function EnrollmentCard({ b, row, several, canWork, canPay, canPlan, onEdit }: {
               {program && <Pill className="bg-navy-900 text-white">{program.code}</Pill>}
               {e.additional && <Pill className="bg-info-bg text-info">Additional enrollment</Pill>}
               {e.addedAsExisting && <Pill className="bg-[#eeeff3] text-[#4b4e66]">Added as existing customer</Pill>}
+              {withdrawn && <Pill className="bg-[#eeeff3] text-[#4b4e66]">Withdrawn</Pill>}
             </p>
             <p className="mt-1 font-medium">{name}</p>
             {course && <p className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted"><CourseTypeChip type={courseTypeOf(ref, course)} /> {courseFacts(course)}</p>}
           </div>
           <div className="flex items-center gap-2">
-            <PaymentBadge status={status} />
+            {t.refunded > 0 ? <RefundBadge refunded={t.refunded} paid={t.paid} /> : <PaymentBadge status={status} />}
             {canEditEnrollment && <Button size="sm" icon={<Pencil size={14} />} onClick={onEdit} aria-label={several ? `Change ${name}` : undefined}>Change</Button>}
             {me.role === "manager" && <IconButton label={`Delete enrollment ${name}`} icon={<Trash2 size={15} />} onClick={() => setDeleting(true)} />}
           </div>
         </div>
         <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
           <div><p className="text-xs text-muted">Agreed total</p><p className="font-semibold tabular-nums">{formatMoney(t.agreed, e.currency)}</p></div>
-          <div><p className="text-xs text-muted">Confirmed paid</p><p className="font-semibold tabular-nums text-ok">{formatMoney(t.paid, e.currency)}</p></div>
+          <div>
+            <p className="text-xs text-muted">{t.refunded > 0 ? "Paid (after refunds)" : "Confirmed paid"}</p>
+            <p className="font-semibold tabular-nums text-ok" data-testid="paid">{formatMoney(t.paid, e.currency)}</p>
+            {t.refunded > 0 && <p className="text-xs tabular-nums text-bad" data-testid="refunded">{formatMoney(t.refunded, e.currency)} refunded</p>}
+          </div>
           <div><p className="text-xs text-muted">Balance left</p><p className="font-semibold tabular-nums" data-testid="balance-left">{formatMoney(t.balance, e.currency)}</p></div>
         </div>
         <div className="mt-3 h-2 overflow-hidden rounded-full bg-navy-50" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={`Confirmed share of agreed total for ${name}`}>
@@ -161,9 +172,16 @@ function EnrollmentCard({ b, row, several, canWork, canPay, canPlan, onEdit }: {
       <div>
         <div className="mb-2 flex items-center justify-between">
           <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">Payments</h4>
-          {canPay && remaining > 0.005 && (
-            <Button size="sm" variant="primary" icon={<Plus size={14} />} onClick={() => setPaying(true)} aria-label={several ? `Record payment for ${name}` : undefined}>Record payment</Button>
-          )}
+          <div className="flex flex-wrap gap-2">
+            {canPay && !withdrawn && t.paid > 0.005 && !openRequest && (
+              <Button size="sm" icon={<HandCoins size={14} />} onClick={() => setRefunding(true)} aria-label={several ? `${finance ? "Refund" : "Request refund"} for ${name}` : undefined}>
+                {finance ? "Refund" : "Request refund"}
+              </Button>
+            )}
+            {canPay && !withdrawn && remaining > 0.005 && (
+              <Button size="sm" variant="primary" icon={<Plus size={14} />} onClick={() => setPaying(true)} aria-label={several ? `Record payment for ${name}` : undefined}>Record payment</Button>
+            )}
+          </div>
         </div>
         {b.payments.length === 0 ? (
           <p className="text-sm text-muted">No payments recorded yet.</p>
@@ -171,12 +189,28 @@ function EnrollmentCard({ b, row, several, canWork, canPay, canPlan, onEdit }: {
           <div className="space-y-2">{b.payments.map((p) => <SubmissionItem key={p.id} p={p} currency={e.currency} />)}</div>
         )}
       </div>
+      {openRequest && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg bg-warn-bg px-3 py-2 text-xs">
+          <span className="font-medium text-warn">Refund of {formatMoney(openRequest.amount, e.currency)} requested · {REFUND_REASON[openRequest.reason]}</span>
+          {finance && (
+            <span className="ml-auto flex gap-1.5">
+              <Button size="sm" onClick={() => setRefunding(true)}>Record refund</Button>
+              <Button size="sm" variant="danger" onClick={() => setDeclining(true)}>Decline</Button>
+            </span>
+          )}
+        </div>
+      )}
+      <RefundsList refunds={b.refunds} currency={e.currency} />
 
       {paying && (
         <PaymentDialog enrollmentId={e.id} courseName={name} currency={e.currency} remaining={remaining} canPlan={canPlan}
           firstPayment={!b.payments.some((p) => p.status === "pending" || p.status === "confirmed")} onClose={() => setPaying(false)} />
       )}
       {deleting && <DeleteDialog kind="enrollment" id={e.id} onClose={() => setDeleting(false)} />}
+      {declining && openRequest && <DeclineRefundDialog refundId={openRequest.id} onClose={() => setDeclining(false)} />}
+      {refunding && (finance
+        ? <RefundDialog enrollmentId={e.id} courseName={name} currency={e.currency} paid={t.paid} agreed={t.agreed} request={openRequest} onClose={() => setRefunding(false)} />
+        : <RequestRefundDialog enrollmentId={e.id} courseName={name} currency={e.currency} paid={t.paid} onClose={() => setRefunding(false)} />)}
       {dueEdit && <DueDialog enrollmentId={e.id} currency={e.currency} due={dueEdit === "new" ? null : dueEdit} onClose={() => setDueEdit(null)} />}
     </section>
   );
@@ -467,7 +501,7 @@ function useConfirmsAtOnce() {
 }
 
 /** Uploads one receipt and keeps its token (shared by the single and the split payment). */
-function ReceiptPicker({ id, required, receipt, setReceipt, onUploading }: {
+export function ReceiptPicker({ id, required, receipt, setReceipt, onUploading }: {
   id: string; required: boolean; receipt: { token: string; name: string } | null; setReceipt: (r: { token: string; name: string } | null) => void; onUploading: (b: boolean) => void;
 }) {
   const toast = useToast();
