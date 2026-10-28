@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Button, IconButton } from "@/components/ui/button";
 import { cn as clsx } from "@/components/ui/cn";
 import { Checkbox, Field, Input, Select, Textarea, Toggle } from "@/components/ui/form";
+import { SearchChecklist } from "@/components/ui/search-select";
 import { Card, CardHeader, EmptyState } from "@/components/ui/misc";
 import { Dialog } from "@/components/ui/overlay";
 import { academyMonth, shiftDay } from "@/domain/accounting";
@@ -168,11 +169,13 @@ function TeacherDialog({ teacher, onClose }: { teacher: Partial<Teacher>; onClos
         <Field label="Email">{(p) => <Input dir="ltr" type="email" value={f.email} maxLength={200} onChange={(e) => setF({ ...f, email: e.target.value })} {...p} />}</Field>
         <fieldset className="sm:col-span-2">
           <legend className="mb-1.5 text-[13px] font-medium">Programs taught</legend>
-          <div className="flex flex-wrap gap-4">
-            {ref.programs.map((p) => (
-              <Checkbox key={p.id} label={p.name} checked={f.programIds.includes(p.id)}
-                onChange={(v) => setF({ ...f, programIds: v ? [...f.programIds, p.id] : f.programIds.filter((x) => x !== p.id) })} />
-            ))}
+          <div className={ref.programs.length > 7 ? "" : "flex flex-wrap gap-4"}>
+            <SearchChecklist label="Programs">
+              {ref.programs.map((p) => (
+                <Checkbox key={p.id} label={p.name} checked={f.programIds.includes(p.id)}
+                  onChange={(v) => setF({ ...f, programIds: v ? [...f.programIds, p.id] : f.programIds.filter((x) => x !== p.id) })} />
+              ))}
+            </SearchChecklist>
           </div>
         </fieldset>
         <Field label="Notes (optional)" className="sm:col-span-2">{(p) => <Textarea value={f.notes} maxLength={1000} onChange={(e) => setF({ ...f, notes: e.target.value })} placeholder="e.g. Math and Reading, evenings only" {...p} />}</Field>

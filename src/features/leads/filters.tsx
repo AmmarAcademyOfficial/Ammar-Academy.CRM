@@ -6,6 +6,7 @@ import { useState } from "react";
 import { TAG_COLORS } from "@/components/ui/badges";
 import { Button } from "@/components/ui/button";
 import { Checkbox, Field, Input, Select } from "@/components/ui/form";
+import { SearchChecklist } from "@/components/ui/search-select";
 import { Dialog } from "@/components/ui/overlay";
 import { cairoParts } from "@/domain/rules";
 import type { DateFilterField, LeadFilters, TagColor } from "@/domain/types";
@@ -54,7 +55,8 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
   return (
     <fieldset className="space-y-2">
       <legend className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">{title}</legend>
-      {children}
+      {/* More than 7 choices: a search box (ticked ones stay visible). */}
+      <SearchChecklist label={title}>{children}</SearchChecklist>
     </fieldset>
   );
 }

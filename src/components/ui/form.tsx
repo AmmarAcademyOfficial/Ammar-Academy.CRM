@@ -1,5 +1,7 @@
 import { cn as clsx } from "./cn";
 import { useId, type ComponentProps, type ReactNode } from "react";
+import { SearchSelect } from "./search-select";
+import { optionsOf, SEARCH_FROM } from "./search-text";
 
 const control =
   "w-full rounded-lg border border-line bg-white px-3 text-sm text-ink placeholder:text-muted/70 focus:border-navy-600 focus:outline-none focus:ring-2 focus:ring-navy-600/20 disabled:bg-canvas disabled:text-muted aria-[invalid=true]:border-bad";
@@ -42,7 +44,14 @@ export function Textarea({ className, ...rest }: ComponentProps<"textarea">) {
   return <textarea dir="auto" className={clsx(control, "min-h-[84px] py-2 leading-relaxed", className)} {...rest} />;
 }
 
-export function Select({ className, children, ...rest }: ComponentProps<"select">) {
+/**
+ * A dropdown. With more than 7 choices it also gets a search button (see SearchSelect), on every
+ * screen at once; shorter lists stay a plain select. searchable={false} turns the button off.
+ */
+export function Select({ className, children, searchable, ...rest }: ComponentProps<"select"> & { searchable?: boolean }) {
+  if (searchable !== false && !rest.multiple && optionsOf(children).length >= SEARCH_FROM) {
+    return <SearchSelect className={className} controlClass={control} {...rest}>{children}</SearchSelect>;
+  }
   return (
     <select className={clsx(control, "h-10 pr-8", className)} {...rest}>
       {children}
