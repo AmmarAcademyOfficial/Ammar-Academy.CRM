@@ -4,6 +4,7 @@ import { useState } from "react";
 import { TAG_COLORS, TagChip } from "@/components/ui/badges";
 import { Button } from "@/components/ui/button";
 import { Checkbox, Field, Input, Select, Textarea } from "@/components/ui/form";
+import { matches, SEARCH_FROM } from "@/components/ui/search-text";
 import { Dialog } from "@/components/ui/overlay";
 import { useToast } from "@/components/ui/toast";
 import { can } from "@/domain/permissions";
@@ -143,6 +144,7 @@ export function TagsDialog({ onClose, inquiry }: { onClose: () => void; inquiry:
   const [primary, setPrimary] = useState<ID | undefined>(inquiry.primaryTagId);
   const [newName, setNewName] = useState("");
   const [newColor, setNewColor] = useState<TagColor>("green");
+  const [tagQ, setTagQ] = useState("");
   const canCreate = can(me.role, "tag.create", { agentsCanCreateTags: ref.settings.agentsCanCreateTags });
   const toggle = (id: ID) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
   const usable = ref.tags.filter((t) => !t.archived || inquiry.tagIds.includes(t.id));
@@ -152,8 +154,11 @@ export function TagsDialog({ onClose, inquiry }: { onClose: () => void; inquiry:
   };
   return (
     <Dialog open onClose={onClose} title="Tags" description="Pick any tags. One can be the primary label, shown as a colored accent on the row." footer={<><Button onClick={onClose}>Cancel</Button><Button variant="primary" onClick={save}>Save tags</Button></>}>
+      {usable.length >= SEARCH_FROM && (
+        <Input type="search" aria-label="Search Tags" placeholder="Search tags" value={tagQ} onChange={(e) => setTagQ(e.target.value)} className="mb-2 h-9" />
+      )}
       <ul className="divide-y divide-line rounded-lg border border-line">
-        {usable.map((t) => (
+        {usable.filter((t) => selected.includes(t.id) || matches(t.name, tagQ)).map((t) => (
           <li key={t.id} className="flex items-center gap-3 px-3 py-2">
             <Checkbox label={<TagChip tag={t} />} checked={selected.includes(t.id)} onChange={() => toggle(t.id)} />
             <label className="ml-auto flex items-center gap-1.5 text-xs text-muted">
