@@ -101,12 +101,16 @@ export function useApi<T>(url: string | null, poll?: { everyMs?: number; whenHid
           router.replace("/login");
           return;
         }
-        const body = await r.json().catch(() => ({}));
-        if (!r.ok) setState((s) => ({ key, data: s.data, error: body.error ?? "Could not load data." }));
+        const body = await r.json().catch(() => undefined);
+        // A newer request replaced this one (for example after a save): its half-read reply is ignored.
+        if (ctrl.signal.aborted) return;
+        if (!r.ok) setState((s) => ({ key, data: s.data, error: body?.error ?? "Could not load data." }));
+        // An unreadable reply never replaces the data on screen with an empty answer.
+        else if (body === undefined) setState((s) => ({ key, data: s.data, error: "Could not load data. Retrying shortly." }));
         else setState({ key, data: body as T });
       })
       .catch((e) => {
-        if (e?.name !== "AbortError") setState((s) => ({ key, data: s.data, error: "You appear to be offline. Retrying shortly." }));
+        if (e?.name !== "AbortError" && !ctrl.signal.aborted) setState((s) => ({ key, data: s.data, error: "You appear to be offline. Retrying shortly." }));
       });
     return () => ctrl.abort();
   }, [url, key, router]);
