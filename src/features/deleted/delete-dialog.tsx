@@ -15,13 +15,19 @@ const TITLE: Record<DeleteKind, string> = {
   enrollment: "Delete enrollment",
   lead: "Delete lead",
   customer: "Delete person",
+  teacher: "Delete teacher",
+  rate: "Delete rate",
 };
 
 /**
  * Asks for a reason (and the word DELETE when confirmed money goes), after showing exactly what
  * will go with the record. Deleted records can be restored from Deleted items for 30 days.
  */
-export function DeleteDialog({ kind, id, onClose, onDeleted }: { kind: DeleteKind; id: string; onClose: () => void; onDeleted?: () => void }) {
+export function DeleteDialog({ kind, id, onClose, onDeleted, alternative }: {
+  kind: DeleteKind; id: string; onClose: () => void; onDeleted?: () => void;
+  /** For a teacher or rate already used: the safe choice instead (Not active, Archive), or null when already done. */
+  alternative?: { label: string; run: () => Promise<boolean> } | null;
+}) {
   const { me } = useWorkspace();
   const runAction = useRunAction();
   const [preview, setPreview] = useState<DeletePreview | null>(null);
@@ -41,11 +47,12 @@ export function DeleteDialog({ kind, id, onClose, onDeleted }: { kind: DeleteKin
   }, [kind, id]);
 
   const where = me.role === "manager" ? "Settings → Deleted items" : "Accounting → Deleted items";
-  const ready = !!preview && !preview.closedMonth && !!reason.trim() && (!preview.needsTyped || typed.trim() === "DELETE");
+  const reference = kind === "teacher" || kind === "rate";
+  const ready = !!preview && !preview.closedMonth && !preview.used && !!reason.trim() && (!preview.needsTyped || typed.trim() === "DELETE");
   const submit = async () => {
     if (!ready) return;
     setBusy(true);
-    const r = await runAction(deleteRecord({ kind, id, reason, confirm: preview?.needsTyped ? typed.trim() : undefined }), null);
+    const r = await runAction(deleteRecord({ kind, id, reason, confirm: preview?.needsTyped ? typed.trim() : undefined }), null, { reference });
     setBusy(false);
     if (r.ok) {
       runAction(Promise.resolve({ ok: true as const, value: null }),
@@ -63,11 +70,21 @@ export function DeleteDialog({ kind, id, onClose, onDeleted }: { kind: DeleteKin
       {failed && <p role="alert" className="text-sm text-bad">{failed}</p>}
       {preview && (
         <div className="space-y-4">
-          <div className="rounded-lg bg-canvas px-3 py-2.5 text-sm" data-testid="delete-summary">
+          {!preview.used && <div className="rounded-lg bg-canvas px-3 py-2.5 text-sm" data-testid="delete-summary">
             <p className="font-medium">This deletes: {preview.summary}.</p>
             <p className="mt-1 text-xs text-muted">It leaves every list, report and Accounting figure at once. You can restore it from {where} for 30 days; after that it is removed for good.</p>
-          </div>
-          {preview.closedMonth ? (
+          </div>}
+          {preview.used ? (
+            <div role="alert" className="space-y-3 rounded-lg bg-warn-bg px-3 py-2.5 text-sm">
+              <p className="flex items-start gap-2">
+                <AlertTriangle size={15} className="mt-0.5 shrink-0 text-warn" aria-hidden />
+                <span>Already used: {preview.linked}. Deleting would erase who taught which sessions and what was paid, so it cannot be deleted.</span>
+              </p>
+              {alternative ? (
+                <Button size="sm" variant="navy" disabled={busy} onClick={async () => { setBusy(true); const ok = await alternative.run(); setBusy(false); if (ok) onClose(); }}>{alternative.label}</Button>
+              ) : alternative === null ? <p className="text-xs">It is already hidden from every list, with its history kept.</p> : null}
+            </div>
+          ) : preview.closedMonth ? (
             <p role="alert" className="flex items-start gap-2 rounded-lg bg-bad-bg px-3 py-2.5 text-sm text-bad">
               <AlertTriangle size={15} className="mt-0.5 shrink-0" aria-hidden />
               It has sessions in a closed salary month ({preview.closedMonth}), so it cannot be deleted. A manager can reopen the month in Accounting → Teachers, then delete it.

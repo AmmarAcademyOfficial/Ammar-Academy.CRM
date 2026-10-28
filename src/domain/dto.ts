@@ -568,7 +568,7 @@ export interface ReviewQueue {
 
 // ── Deleted items (plan 3, release 2) ────────────────────────────────────
 
-export type DeleteKind = "payment" | "enrollment" | "lead" | "customer";
+export type DeleteKind = "payment" | "enrollment" | "lead" | "customer" | "teacher" | "rate";
 
 /** What a delete would remove, shown in the dialog before anything changes. */
 export interface DeletePreview {
@@ -585,6 +585,10 @@ export interface DeletePreview {
   needsTyped: boolean;
   /** The first closed salary month among its sessions: it cannot be deleted. */
   closedMonth: string | null;
+  /** A teacher or rate already used: it cannot be deleted (Not active or Archive instead). */
+  used: boolean;
+  /** What links it, e.g. "3 customers, 14 recorded sessions, 2 closed salary months". */
+  linked: string | null;
 }
 
 export interface DeletedItem {
