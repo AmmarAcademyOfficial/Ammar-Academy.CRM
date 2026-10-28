@@ -59,11 +59,17 @@ export function SupportTab({ detail }: { detail: LeadDetail }) {
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Status</h3>
           <SupportStatusBadge status={ob.status} />
         </div>
-        <Select aria-label="Support status" value={ob.status} disabled={!canWork}
-          onChange={(e) => runAction(setSupportStatus(ob.id, e.target.value as SupportStatus), "Support status updated")}>
-          {(Object.keys(SUPPORT_STATUS_LABEL) as SupportStatus[]).map((s) => <option key={s} value={s}>{SUPPORT_STATUS_LABEL[s]}</option>)}
-        </Select>
-        {ob.status !== "active" && <p className="mt-1 text-xs text-muted">Active needs every checklist step done.</p>}
+        {ob.status === "withdrawn" ? (
+          <p className="text-sm text-muted">The customer withdrew from this course after a refund. Future sessions and unpaid planned payments were removed.</p>
+        ) : (
+          <>
+            <Select aria-label="Support status" value={ob.status} disabled={!canWork}
+              onChange={(e) => runAction(setSupportStatus(ob.id, e.target.value as Exclude<SupportStatus, "withdrawn">), "Support status updated")}>
+              {(["new_customer", "onboarding", "active"] as const).map((s) => <option key={s} value={s}>{SUPPORT_STATUS_LABEL[s]}</option>)}
+            </Select>
+            {ob.status !== "active" && <p className="mt-1 text-xs text-muted">Active needs every checklist step done.</p>}
+          </>
+        )}
       </section>
 
       <section>

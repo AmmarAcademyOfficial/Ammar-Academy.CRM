@@ -99,8 +99,8 @@ describe("the list", () => {
     const page2 = await list(manager, {}, { sort: { key: "customer", dir: "asc" }, pageSize: 5, page: 1 });
     expect([page2.total, page2.rows.length]).toEqual([4, 0]);
     expect(byName.totals).toEqual([
-      { currency: "EGP", count: 3, agreed: 3000, paid: 1300, balance: 1700, overdue: 500 },
-      { currency: "USD", count: 1, agreed: 400, paid: 0, balance: 400, overdue: 0 },
+      { currency: "EGP", count: 3, agreed: 3000, paid: 1300, refunded: 0, balance: 1700, overdue: 500 },
+      { currency: "USD", count: 1, agreed: 400, paid: 0, refunded: 0, balance: 400, overdue: 0 },
     ]);
   });
 });

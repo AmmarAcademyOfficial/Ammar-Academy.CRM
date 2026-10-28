@@ -11,13 +11,16 @@ type Row = Record<string, unknown>;
 type Frag = postgres.Fragment;
 
 const TOTALS = (tx: Tx) => tx`
-  coalesce((select sum(x.amount) from public.payments x where x.enrollment_id = e.id and x.status = 'confirmed'), 0) as paid,
+  coalesce((select sum(x.amount) from public.payments x where x.enrollment_id = e.id and x.status = 'confirmed'), 0)
+    - coalesce((select sum(r.amount) from public.refunds r where r.enrollment_id = e.id and r.status = 'recorded'), 0) as paid,
+  coalesce((select sum(r.amount) from public.refunds r where r.enrollment_id = e.id and r.status = 'recorded'), 0) as refunded,
   coalesce((select sum(x.amount) from public.payments x where x.enrollment_id = e.id and x.status = 'pending'), 0) as pending`;
 
 function totals(r: Row) {
   const agreed = Number(r.agreed_total);
   const paid = Number(r.paid);
-  return { agreed, paid, pending: Number(r.pending), balance: Math.max(agreed - paid, 0) };
+  // A withdrawn customer owes nothing more.
+  return { agreed, paid, pending: Number(r.pending), balance: r.withdrawn_at ? 0 : Math.max(agreed - paid, 0), refunded: Number(r.refunded ?? 0) };
 }
 
 // ── Payments queue (managers) ────────────────────────────────────────────
@@ -30,7 +33,7 @@ export async function paymentsPage(staff: Staff, tab: PaymentTab): Promise<Payme
     const order = tab === "pending" ? tx`p.submitted_at asc` : tx`coalesce(p.reversed_at, p.decided_at) desc`;
     const [rows, [counts], month, flagged] = await Promise.all([
       tx<Row[]>`
-        select p.*, e.inquiry_id, e.course_id, e.currency, e.agreed_total, i.program_id, i.sales_owner_id, c.name as customer_name, ${TOTALS(tx)}
+        select p.*, e.inquiry_id, e.course_id, e.currency, e.agreed_total, e.withdrawn_at, i.program_id, i.sales_owner_id, c.name as customer_name, ${TOTALS(tx)}
         from public.payments p
         join public.enrollments e on e.id = p.enrollment_id
         join public.inquiries i on i.id = e.inquiry_id
@@ -75,7 +78,7 @@ export async function paymentsPage(staff: Staff, tab: PaymentTab): Promise<Payme
 
 async function customerRows(tx: Tx, where: Frag, order: Frag, limit = 300): Promise<CustomerRow[]> {
   const rows = await tx<Row[]>`
-    select o.*, e.inquiry_id, e.course_id, e.currency, e.agreed_total, i.program_id, i.sales_owner_id, i.student_name,
+    select o.*, e.inquiry_id, e.course_id, e.currency, e.agreed_total, e.withdrawn_at, i.program_id, i.sales_owner_id, i.student_name,
            c.name as customer_name, c.phone_normalized, ${TOTALS(tx)},
            nd.label as next_label, nd.due_at as next_due, nd.kind as next_kind,
            to_jsonb(np) as next_payment,
@@ -146,8 +149,8 @@ export async function listCustomers(staff: Staff, f: CustomerFilters): Promise<C
 export async function supportWork(staff: Staff): Promise<SupportWork> {
   return asUser(staff.id, async (tx) => {
     const [queue, mine, fus, overdue] = await Promise.all([
-      customerRows(tx, tx`o.support_owner_id is null`, tx`o.created_at asc`, 100),
-      customerRows(tx, tx`o.support_owner_id = ${staff.id} and o.status <> 'active'`, tx`(o.flagged_reason is not null) desc, o.created_at asc`, 100),
+      customerRows(tx, tx`o.support_owner_id is null and o.status::text <> 'withdrawn'`, tx`o.created_at asc`, 100),
+      customerRows(tx, tx`o.support_owner_id = ${staff.id} and o.status::text not in ('active', 'withdrawn')`, tx`(o.flagged_reason is not null) desc, o.created_at asc`, 100),
       tx<Row[]>`
         select f.*, c.name as customer_name, e.inquiry_id
         from public.support_follow_ups f

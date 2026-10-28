@@ -5,6 +5,10 @@
 import type { IneligibleReason } from "./rules";
 import type {
   Activity,
+  PaymentMethod,
+  Refund,
+  RefundOutcome,
+  RefundReason,
   AppNotification,
   Teacher,
   TeacherAssignment,
@@ -88,9 +92,12 @@ export interface LeadPage {
 
 export interface PaymentTotalsDTO {
   agreed: number;
+  /** Confirmed payments minus recorded refunds. */
   paid: number;
   pending: number;
   balance: number;
+  /** Recorded refunds (plan 3). */
+  refunded: number;
 }
 
 /** Phase 1: one enrollment of a customer with everything that belongs to it. */
@@ -103,6 +110,8 @@ export interface EnrollmentBundle {
   sessions: TeachingSession[];
   onboarding?: Onboarding;
   supportFollowUps: SupportFollowUp[];
+  /** Refunds and refund requests, newest first (plan 3). */
+  refunds: Refund[];
 }
 
 export interface LeadDetail {
@@ -330,7 +339,11 @@ export interface ReportData {
   enrollments: number;
   /** Phase 1: of those, second or later courses of the same customer. */
   additionalEnrollments?: number;
+  /** Confirmed payments in range minus refunds recorded in range (plan 3). */
   confirmed: (MoneyTotal & { count: number })[];
+  /** Refunds recorded in range, and enrollments withdrawn by them (still counted as enrollments on their day). */
+  refunds?: (MoneyTotal & { count: number })[];
+  withdrawals?: number;
   overdueFollowUps: number;
   overdueByOwner: LabelCount[];
   awaitingOnboarding: number;
@@ -387,10 +400,34 @@ export interface AccountingCustomer {
   overdueSince?: string;
 }
 
+/** Plan 3: a recorded refund, by the date the money was paid back. */
+export interface AccountingRefund {
+  id: ID;
+  refundedOn: string;
+  amount: number;
+  currency: string;
+  method: PaymentMethod;
+  reference: string | null;
+  hasReceipt: boolean;
+  reason: RefundReason;
+  note: string | null;
+  outcome: RefundOutcome;
+  recordedBy: ID;
+  enrollmentId: ID;
+  inquiryId: ID;
+  customerName: string;
+  programId: ID;
+  courseId: ID;
+  courseTypeId: ID | null;
+  salesAgentId: ID | null;
+  supportOwnerId: ID | null;
+}
+
 export interface AccountingData {
   range: { from: string; to: string };
   payments: AccountingPayment[];
   customers: AccountingCustomer[];
+  refunds: AccountingRefund[];
 }
 
 // ── Sessions (phase 4) ───────────────────────────────────────────────────
@@ -465,8 +502,8 @@ export interface SalaryReport {
 }
 
 /** Part B: the Enrollments list (one row per enrollment). */
-export type EnrollmentStatus = "not_handed_over" | "new_customer" | "onboarding" | "active" | "flagged";
-export type PaymentState = "paid" | "balance" | "overdue" | "pending" | "none";
+export type EnrollmentStatus = "not_handed_over" | "new_customer" | "onboarding" | "active" | "flagged" | "withdrawn";
+export type PaymentState = "paid" | "balance" | "overdue" | "pending" | "none" | "refunded";
 export interface EnrollmentFilters {
   search: string;
   programIds: string[];
@@ -504,6 +541,8 @@ export interface EnrollmentListRow {
   agreed: number;
   paid: number;
   pending: number;
+  /** Recorded refunds (plan 3); Paid is already net of them. */
+  refunded: number;
   balance: number;
   lastPaidOn: string | null;
   nextDueOn: string | null;
@@ -529,7 +568,7 @@ export interface EnrollmentList {
   page: number;
   pageSize: number;
   scope: "mine" | "all";
-  totals: { currency: string; count: number; agreed: number; paid: number; balance: number; overdue: number }[];
+  totals: { currency: string; count: number; agreed: number; paid: number; refunded: number; balance: number; overdue: number }[];
   rows: EnrollmentListRow[];
 }
 
@@ -560,8 +599,27 @@ export interface ReviewQueueItem {
   reviewedBy: string | null;
   reviewedAt: string | null;
 }
+/** Plan 3: a refund someone asked for, waiting for a manager or the accountant. */
+export interface RefundRequestItem {
+  id: string;
+  enrollmentId: string;
+  inquiryId: string;
+  customerName: string;
+  phone: string | null;
+  courseName: string;
+  currency: string;
+  amount: number;
+  reason: RefundReason;
+  note: string | null;
+  requestedBy: string | null;
+  requestedAt: string;
+  /** Confirmed paid, after earlier refunds. */
+  paid: number;
+  agreed: number;
+}
 export interface ReviewQueue {
   pendingPayments: number;
+  refundRequests: RefundRequestItem[];
   items: ReviewQueueItem[];
   recent: { enrollmentId: string; inquiryId: string; customerName: string; courseName: string; reviewedBy: string | null; reviewedAt: string; note: string | null }[];
 }

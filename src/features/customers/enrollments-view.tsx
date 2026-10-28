@@ -22,10 +22,10 @@ export const EMPTY_ENROLLMENT_FILTERS: EnrollmentFilters = {
   statuses: [], paymentStates: [], currency: "", enrolledFrom: "", enrolledTo: "", startFrom: "", startTo: "",
 };
 const STATUS_LABEL: Record<EnrollmentStatus, string> = {
-  not_handed_over: "Not handed over yet", new_customer: "New customer", onboarding: "Onboarding", active: "Active", flagged: "Flagged for review",
+  not_handed_over: "Not handed over yet", new_customer: "New customer", onboarding: "Onboarding", active: "Active", flagged: "Flagged for review", withdrawn: "Withdrawn",
 };
 const PAYMENT_LABEL: Record<PaymentState, string> = {
-  paid: "Fully paid", balance: "Balance left", overdue: "Overdue", pending: "Payment waiting for review", none: "No payment yet",
+  paid: "Fully paid", balance: "Balance left", overdue: "Overdue", pending: "Payment waiting for review", none: "No payment yet", refunded: "Refunded",
 };
 const PAGE_SIZE = 50;
 const STORE_KEY = "crm.enrollments.filters.v1";
@@ -105,6 +105,7 @@ export function EnrollmentsView() {
             <Card key={t.currency} className="flex flex-wrap items-baseline gap-x-4 gap-y-1 px-4 py-2.5 text-sm">
               <span className="font-semibold">{t.count} customer{t.count === 1 ? "" : "s"} · {t.currency}</span>
               <span>Paid <b className="font-semibold tabular-nums">{formatMoney(t.paid, t.currency)}</b></span>
+              {t.refunded > 0 && <span>Refunded <b className="font-semibold tabular-nums text-bad">{formatMoney(t.refunded, t.currency)}</b></span>}
               <span>Balance left <b className="font-semibold tabular-nums">{formatMoney(t.balance, t.currency)}</b></span>
               {t.overdue > 0 && <span className="text-bad">Overdue <b className="font-semibold tabular-nums">{formatMoney(t.overdue, t.currency)}</b></span>}
             </Card>
@@ -178,9 +179,9 @@ export function EnrollmentsView() {
                         <span className="block truncate text-muted">{r.supportOwnerId ? profileName(ref, r.supportOwnerId) : r.status === "not_handed_over" ? "Not with support yet" : "Unclaimed"}</span>
                       </td>
                       <td className="px-3 py-2.5"><StatusCell s={r.status} /></td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums">{formatMoney(r.paid, r.currency)}<span className="block text-xs text-muted">of {formatMoney(r.agreed, r.currency)}</span></td>
+                      <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums">{formatMoney(r.paid, r.currency)}<span className="block text-xs text-muted">of {formatMoney(r.agreed, r.currency)}</span>{r.refunded > 0 && <span className="block text-xs text-bad" data-refunded>{formatMoney(r.refunded, r.currency)} refunded</span>}</td>
                       <td className={clsx("whitespace-nowrap px-3 py-2.5 text-right font-medium tabular-nums", r.balance === 0 && "text-ok")}>
-                        {r.balance === 0 ? "Paid" : formatMoney(r.balance, r.currency)}
+                        {r.status === "withdrawn" ? "Withdrawn" : r.balance === 0 ? "Paid" : formatMoney(r.balance, r.currency)}
                         {r.pending > 0 && <span className="block text-xs font-normal text-warn">{formatMoney(r.pending, r.currency)} to review</span>}
                       </td>
                       <td className="whitespace-nowrap px-3 py-2.5 pr-5 text-xs">
@@ -234,8 +235,8 @@ function MobileRow({ r, onOpen }: { r: EnrollmentListRow; onOpen: () => void }) 
         </span>
         <span className="truncate text-xs text-muted">{ref.courses.find((c) => c.id === r.courseId)?.name ?? "—"} · enrolled {formatDay(r.enrolledAt.slice(0, 10))}</span>
         <span className="flex flex-wrap gap-x-3 text-xs">
-          <span>Paid {formatMoney(r.paid, r.currency)} of {formatMoney(r.agreed, r.currency)}</span>
-          {r.overdueLeft > 0 ? <span className="font-medium text-bad">{formatMoney(r.overdueLeft, r.currency)}<span className="block font-normal">overdue</span></span> : r.balance === 0 ? <span className="text-ok">Fully paid</span> : null}
+          <span>Paid {formatMoney(r.paid, r.currency)} of {formatMoney(r.agreed, r.currency)}{r.refunded > 0 ? ` · ${formatMoney(r.refunded, r.currency)} refunded` : ""}</span>
+          {r.overdueLeft > 0 ? <span className="font-medium text-bad">{formatMoney(r.overdueLeft, r.currency)}<span className="block font-normal">overdue</span></span> : r.status === "withdrawn" ? <span className="text-muted">Withdrawn</span> : r.balance === 0 ? <span className="text-ok">Fully paid</span> : null}
         </span>
       </button>
     </li>

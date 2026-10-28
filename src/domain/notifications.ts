@@ -43,6 +43,8 @@ export const NOTIFICATION_GROUPS: { title: string; events: NotificationEvent[] }
       { key: "new_customer_ready", label: "New customer ready for onboarding", description: "A newly enrolled customer is waiting for support.", roles: ["support"] },
       { key: "support_assigned", label: "Customer assigned for onboarding", description: "A customer is given to this support agent.", roles: ["support"] },
       { key: "package_low", label: "Package almost used", description: "A private customer has 2 hours or fewer left in their package.", roles: ["support", "manager"] },
+      { key: "refund_requested", label: "Refund requested", description: "Support or sales asked for a refund; record it or decline it in Accounting → To review.", roles: ["manager", "accountant"] },
+      { key: "refund_update", label: "Refund recorded or declined", description: "A refund was recorded for the person's customer, or their request was declined.", roles: ["sales", "support", "manager"] },
       { key: "customer_flagged", label: "Customer flagged after a payment reversal", description: "A handed-over customer's confirmed payments fell below the handover rule.", roles: ["support", "manager"] },
     ],
   },

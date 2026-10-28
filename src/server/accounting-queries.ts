@@ -1,5 +1,5 @@
 import "server-only";
-import type { AccountingCustomer, AccountingData, AccountingPayment } from "@/domain/dto";
+import type { AccountingCustomer, AccountingData, AccountingPayment, AccountingRefund } from "@/domain/dto";
 import type { Staff } from "./auth";
 import { asUser } from "./db";
 import { mapPayment } from "./mappers";
@@ -20,9 +20,10 @@ const day = (v: unknown): string | undefined => {
 
 export async function accountingData(staff: Staff, from: string, to: string): Promise<AccountingData> {
   return asUser(staff.id, async (tx) => {
-    const [pays, custs] = await Promise.all([
+    const [pays, custs, [{ refunds }]] = await Promise.all([
       tx<Row[]>`select * from public.accounting_payments(${from}::date, ${to}::date)`,
       tx<Row[]>`select * from public.accounting_customers()`,
+      tx<{ refunds: AccountingRefund[] }[]>`select public.accounting_refunds(${from}::date, ${to}::date) as refunds`,
     ]);
     const payments = pays.map((r): AccountingPayment => ({
       payment: { ...mapPayment({ ...r, enrollment_id: r.enrollment_id, receipt_path: r.has_receipt ? "x" : null }), paidOn: day(r.paid_on)! },
@@ -52,7 +53,7 @@ export async function accountingData(staff: Staff, from: string, to: string): Pr
         agreed,
         paid,
         pending: Number(r.pending),
-        balance: Math.max(agreed - paid, 0),
+        balance: r.withdrawn ? 0 : Math.max(agreed - paid, 0),
         enrolledAt: new Date(r.enrolled_at as string).toISOString(),
         handedOverAt: r.handed_over_at ? new Date(r.handed_over_at as string).toISOString() : undefined,
         salesAgentId: id(r.sales_agent_id),
@@ -62,6 +63,6 @@ export async function accountingData(staff: Staff, from: string, to: string): Pr
         overdueSince: day(r.overdue_since),
       };
     });
-    return { range: { from, to }, payments, customers };
+    return { range: { from, to }, payments, customers, refunds: refunds.map((x) => ({ ...x, amount: Number(x.amount) })) };
   });
 }

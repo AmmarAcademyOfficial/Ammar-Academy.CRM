@@ -19,7 +19,7 @@ export interface TotalsSpec {
   currencyColumn: number;
   sumColumns: number[];
   /** Only rows where this column equals this text (for example, confirmed payments). */
-  where?: { column: number; equals: string };
+  where?: { column: number; equals: string | string[] };
 }
 export interface Sheet { name: string; columns: Column[]; rows: CellValue[][]; totals?: TotalsSpec }
 
@@ -121,9 +121,14 @@ function sheetXml(sh: Sheet): string {
       for (const col of t.sumColumns) {
         const L = columnLetter(col);
         const w = t.where;
-        const sum = sh.rows.reduce((a, r) => (String(r[t.currencyColumn]) === c && (!w || String(r[w.column]) === w.equals) && Number.isFinite(Number(r[col])) ? a + Number(r[col]) : a), 0);
-        const extra = w ? `,${columnLetter(w.column)}2:${columnLetter(w.column)}${dataEnd},"${xml(w.equals.replace(/"/g, '""'))}"` : "";
-        parts.push(`<c r="${L}${n}" s="7"><f>SUMIFS(${L}2:${L}${dataEnd},${cur}2:${cur}${dataEnd},"${xml(c.replace(/"/g, '""'))}"${extra})</f><v>${Math.round(sum * 100) / 100}</v></c>`);
+        const wanted = w ? (Array.isArray(w.equals) ? w.equals : [w.equals]) : [];
+        const sum = sh.rows.reduce((a, r) => (String(r[t.currencyColumn]) === c && (!w || wanted.includes(String(r[w.column]))) && Number.isFinite(Number(r[col])) ? a + Number(r[col]) : a), 0);
+        const q = (v: string) => `"${xml(v.replace(/"/g, '""'))}"`;
+        // Several values: an array constant, summed (SUM(SUMIFS(…, {"a","b"}))).
+        const crit = wanted.length > 1 ? `{${wanted.map(q).join(",")}}` : wanted.length ? q(wanted[0]) : "";
+        const extra = w ? `,${columnLetter(w.column)}2:${columnLetter(w.column)}${dataEnd},${crit}` : "";
+        const f = `SUMIFS(${L}2:${L}${dataEnd},${cur}2:${cur}${dataEnd},${q(c)}${extra})`;
+        parts.push(`<c r="${L}${n}" s="7"><f>${wanted.length > 1 ? `SUM(${f})` : f}</f><v>${Math.round(sum * 100) / 100}</v></c>`);
       }
       out.push(`<row r="${n}">${parts.join("")}</row>`);
       lastRow = n;

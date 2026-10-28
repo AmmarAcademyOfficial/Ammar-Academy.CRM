@@ -2,6 +2,7 @@ import "server-only";
 import type { LeadRowDTO } from "@/domain/dto";
 import type {
   Activity,
+  Refund,
   ActivityType,
   AppNotification,
   AuditEntry,
@@ -106,6 +107,7 @@ export const mapEnrollment = (r: Row): Enrollment => ({
   packageHoursBefore: Number(r.package_hours_before ?? 0),
   additional: Boolean(r.additional),
   addedAsExisting: Boolean(r.added_as_existing),
+  withdrawnAt: r.withdrawn_at ? iso(r.withdrawn_at) : null,
   review: {
     status: (r.review_status as Enrollment["review"]["status"]) ?? "to_review",
     reason: str(r.review_reason ?? "New enrollment"),
@@ -136,6 +138,28 @@ export const mapPayment = (r: Row): PaymentSubmission => ({
   reversalReason: strOpt(r.reversal_reason),
   kind: (r.kind as PaymentSubmission["kind"]) ?? undefined,
   splitGroup: r.split_group ? str(r.split_group) : undefined,
+});
+
+export const mapRefund = (r: Row): Refund => ({
+  id: str(r.id),
+  enrollmentId: str(r.enrollment_id),
+  status: r.status as Refund["status"],
+  amount: Number(r.amount),
+  reason: r.reason as Refund["reason"],
+  note: strOpt(r.note),
+  outcome: (r.outcome as Refund["outcome"]) ?? undefined,
+  refundedOn: day(r.refunded_on) ?? undefined,
+  method: (r.method as Refund["method"]) ?? undefined,
+  reference: strOpt(r.reference),
+  hasReceipt: Boolean(r.receipt_path),
+  receiptName: strOpt(r.receipt_name),
+  requestedById: strOpt(r.requested_by),
+  requestedAt: isoOpt(r.requested_at),
+  recordedById: strOpt(r.recorded_by),
+  recordedAt: isoOpt(r.recorded_at),
+  declinedById: strOpt(r.declined_by),
+  declinedAt: isoOpt(r.declined_at),
+  declineReason: strOpt(r.decline_reason),
 });
 
 const dayOf = (v: unknown): string | undefined => {
