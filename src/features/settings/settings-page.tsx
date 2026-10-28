@@ -26,6 +26,7 @@ import {
   updateSettings,
   updateTag,
 } from "@/server/actions";
+import { DeletedItemsView } from "@/features/deleted/deleted-items";
 import { AuditSettings } from "./audit-settings";
 import { ChecklistSettings } from "./checklist-settings";
 import { CoursesSettings } from "./courses-settings";
@@ -49,6 +50,7 @@ const SECTIONS = [
   { id: "checklist", label: "Support Checklist" },
   { id: "sheets", label: "Google Sheets Connections" },
   { id: "audit", label: "Audit History" },
+  { id: "deleted", label: "Deleted items" },
 ] as const;
 
 export function SettingsPage({ section }: { section?: string }) {
@@ -96,6 +98,7 @@ export function SettingsPage({ section }: { section?: string }) {
           {current?.id === "checklist" && <ChecklistSettings />}
           {current?.id === "sheets" && <SheetsSettings />}
           {current?.id === "audit" && <AuditSettings />}
+          {current?.id === "deleted" && <DeletedItemsView />}
         </div>
       </div>
     </div>

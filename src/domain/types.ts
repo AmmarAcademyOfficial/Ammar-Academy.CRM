@@ -191,7 +191,8 @@ export type ActivityType =
   | "support_follow_up"
   | "payment_plan"
   | "teacher"
-  | "session";
+  | "session"
+  | "deleted";
 
 export interface Activity {
   id: ID;

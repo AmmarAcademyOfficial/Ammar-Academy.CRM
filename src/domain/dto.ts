@@ -565,3 +565,38 @@ export interface ReviewQueue {
   items: ReviewQueueItem[];
   recent: { enrollmentId: string; inquiryId: string; customerName: string; courseName: string; reviewedBy: string | null; reviewedAt: string; note: string | null }[];
 }
+
+// ── Deleted items (plan 3, release 2) ────────────────────────────────────
+
+export type DeleteKind = "payment" | "enrollment" | "lead" | "customer";
+
+/** What a delete would remove, shown in the dialog before anything changes. */
+export interface DeletePreview {
+  label: string;
+  summary: string;
+  people: number;
+  leads: number;
+  enrollments: number;
+  payments: number;
+  sessions: number;
+  /** Confirmed money per currency, e.g. {"EGP": 4500}. */
+  confirmed: Record<string, number>;
+  /** Confirmed money goes: the word DELETE must be typed. */
+  needsTyped: boolean;
+  /** The first closed salary month among its sessions: it cannot be deleted. */
+  closedMonth: string | null;
+}
+
+export interface DeletedItem {
+  id: string;
+  kind: DeleteKind;
+  label: string;
+  summary: string;
+  reason: string;
+  deletedBy: string;
+  deletedById: string;
+  deletedAt: string;
+  /** Removed for good at this time. */
+  purgeAfter: string;
+  confirmed: Record<string, number>;
+}

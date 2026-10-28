@@ -89,13 +89,15 @@ export function readReceiptToken(token: string, userId: string): ReceiptRef | nu
 // ── Clean-up ─────────────────────────────────────────────────────────────
 // A receipt uploaded in the payment dialog but never submitted is not linked to any payment.
 // A day after upload (long after its 6-hour upload token expired) nobody can attach it, so it is deleted.
-// Linked receipts are never touched. Runs from the scheduler about once an hour.
+// Linked receipts (including those of deleted payments that can still be restored) are never touched. Runs from the scheduler about once an hour.
 
 const ORPHAN_AFTER_MS = 24 * 3600_000;
 
 export async function cleanupOrphanReceipts(now = Date.now()): Promise<{ checked: number; deleted: number }> {
   const linked = new Set(
-    (await asSystem((tx) => tx<{ p: string }[]>`select receipt_path as p from public.payments where receipt_path is not null`)).map((r) => r.p),
+    // Receipts of deleted payments stay until the deleted record is removed for good (30 days), so a restore keeps them.
+    (await asSystem((tx) => tx<{ p: string }[]>`select receipt_path as p from public.payments where receipt_path is not null
+                                               union select private.deleted_receipts()`)).map((r) => r.p),
   );
   let checked = 0;
   let deleted = 0;

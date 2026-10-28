@@ -14,6 +14,8 @@ import {
   PhoneOff,
   StickyNote,
   Tags,
+  Trash2,
+  UserX,
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -25,6 +27,7 @@ import { Field, Input, Select, Textarea } from "@/components/ui/form";
 import { EmptyState, Name, PhoneText, SkeletonRows } from "@/components/ui/misc";
 import { Dialog, Drawer } from "@/components/ui/overlay";
 import type { LeadDetail } from "@/domain/dto";
+import { DeleteDialog } from "@/features/deleted/delete-dialog";
 import { can } from "@/domain/permissions";
 import { followUpTiming, formatCairo, formatRelative, needsNextAction, telUrl, whatsappUrl } from "@/domain/rules";
 import type { ID, StageKey } from "@/domain/types";
@@ -79,6 +82,7 @@ function LeadPanel({ inquiryId, onClose, onDirtyChange }: { inquiryId: ID; onClo
   const [note, setNote] = useState("");
   const [detailsDirty, setDetailsDirty] = useState(false);
   const [menu, setMenu] = useState(false);
+  const [deleting, setDeleting] = useState<"lead" | "customer" | null>(null);
   const [busy, setBusy] = useState(false);
   // Phase 1: which course the Support tab shows when the customer has several handed-over enrollments.
   const [courseSel, setCourseSel] = useState<string | null>(null);
@@ -294,6 +298,12 @@ function LeadPanel({ inquiryId, onClose, onDirtyChange }: { inquiryId: ID; onClo
                   ) : (
                     <MenuItem icon={<PhoneOff size={15} />} danger onClick={() => setModal("dnc")}>Mark Do Not Contact</MenuItem>
                   )}
+                  {me.role === "manager" && (
+                    <>
+                      <MenuItem icon={<Trash2 size={15} />} danger onClick={() => setDeleting("lead")}>Delete this lead</MenuItem>
+                      <MenuItem icon={<UserX size={15} />} danger onClick={() => setDeleting("customer")}>Delete the person and all their leads</MenuItem>
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -354,6 +364,7 @@ function LeadPanel({ inquiryId, onClose, onDirtyChange }: { inquiryId: ID; onClo
         )}
       </div>
 
+      {deleting && <DeleteDialog kind={deleting} id={deleting === "lead" ? q.id : row.contact.id} onClose={() => setDeleting(null)} onDeleted={onClose} />}
       {modal === "followup" && <FollowUpDialog onClose={() => setModal(null)} inquiryId={q.id} />}
       {modal === "outcome" && <RecordOutcomeDialog onClose={() => { setModal(null); setShortcut(undefined); }} inquiryId={q.id} channel={shortcut} />}
       {modal === "lost" && <LostDialog onClose={() => setModal(null)} onConfirm={(r) => doChangeStage("lost", r)} />}

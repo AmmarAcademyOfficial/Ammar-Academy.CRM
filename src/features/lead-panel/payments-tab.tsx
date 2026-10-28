@@ -3,7 +3,7 @@
 import { CalendarRange, Check, ClipboardCheck, GraduationCap, Info, Loader2, MessageSquareWarning, Paperclip, Pencil, Plus, Split, Trash2, Undo2, Upload, X } from "lucide-react";
 import { useRef, useState } from "react";
 import { DueBadge, PaymentBadge, Pill, SubmissionBadge } from "@/components/ui/badges";
-import { Button } from "@/components/ui/button";
+import { Button, IconButton } from "@/components/ui/button";
 import { Field, Input, Select, Textarea } from "@/components/ui/form";
 import { EmptyState } from "@/components/ui/misc";
 import { Dialog } from "@/components/ui/overlay";
@@ -16,6 +16,7 @@ import { KIND_LABEL, METHOD_LABEL, courseFacts, courseOf, courseTypeOf, priceTex
 import { profileName, type LeadRow } from "@/lib/lead-row";
 import { useRunAction } from "@/lib/run-action";
 import { useWorkspace } from "@/lib/workspace";
+import { DeleteDialog } from "@/features/deleted/delete-dialog";
 import { decidePayment, deletePaymentDue, reversePayment, reviewEnrollment, saveEnrollment, savePaymentDue, submitPayment, submitSplitPayment } from "@/server/payment-actions";
 
 const HANDOVER_TEXT = {
@@ -104,6 +105,7 @@ function EnrollmentCard({ b, row, several, canWork, canPay, canPlan, onEdit }: {
 }) {
   const { ref, me } = useWorkspace();
   const [paying, setPaying] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [dueEdit, setDueEdit] = useState<PaymentDue | "new" | null>(null);
   const e = b.enrollment;
   const t = b.totals;
@@ -133,6 +135,7 @@ function EnrollmentCard({ b, row, several, canWork, canPay, canPlan, onEdit }: {
           <div className="flex items-center gap-2">
             <PaymentBadge status={status} />
             {canEditEnrollment && <Button size="sm" icon={<Pencil size={14} />} onClick={onEdit} aria-label={several ? `Change ${name}` : undefined}>Change</Button>}
+            {me.role === "manager" && <IconButton label={`Delete enrollment ${name}`} icon={<Trash2 size={15} />} onClick={() => setDeleting(true)} />}
           </div>
         </div>
         <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
@@ -173,6 +176,7 @@ function EnrollmentCard({ b, row, several, canWork, canPay, canPlan, onEdit }: {
         <PaymentDialog enrollmentId={e.id} courseName={name} currency={e.currency} remaining={remaining} canPlan={canPlan}
           firstPayment={!b.payments.some((p) => p.status === "pending" || p.status === "confirmed")} onClose={() => setPaying(false)} />
       )}
+      {deleting && <DeleteDialog kind="enrollment" id={e.id} onClose={() => setDeleting(false)} />}
       {dueEdit && <DueDialog enrollmentId={e.id} currency={e.currency} due={dueEdit === "new" ? null : dueEdit} onClose={() => setDueEdit(null)} />}
     </section>
   );
@@ -217,6 +221,7 @@ export function SubmissionItem({ p, currency, customer }: { p: PaymentSubmission
   const { ref, me } = useWorkspace();
   const runAction = useRunAction();
   const [mode, setMode] = useState<null | "reject" | "reverse">(null);
+  const [deleting, setDeleting] = useState(false);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const isManager = me.role === "manager" || me.role === "accountant"; // may decide payments
@@ -270,11 +275,20 @@ export function SubmissionItem({ p, currency, customer }: { p: PaymentSubmission
           <Button size="sm" variant="danger" icon={<X size={14} />} disabled={busy} onClick={() => setMode("reject")}>Reject</Button>
         </div>
       )}
-      {isManager && p.status === "confirmed" && (
-        <button className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-muted hover:text-bad" onClick={() => setMode("reverse")}>
-          <Undo2 size={12} aria-hidden /> Reverse
-        </button>
+      {isManager && (
+        <div className="mt-2 flex flex-wrap gap-4">
+          {p.status === "confirmed" && (
+            <button className="inline-flex items-center gap-1 text-xs font-medium text-muted hover:text-bad" onClick={() => setMode("reverse")}>
+              <Undo2 size={12} aria-hidden /> Reverse
+            </button>
+          )}
+          <button className="inline-flex items-center gap-1 text-xs font-medium text-muted hover:text-bad" onClick={() => setDeleting(true)}
+            aria-label={`Delete payment ${formatMoney(p.amount, currency)}${customer ? ` for ${customer}` : ""}`}>
+            <Trash2 size={12} aria-hidden /> Delete
+          </button>
+        </div>
       )}
+      {deleting && <DeleteDialog kind="payment" id={p.id} onClose={() => setDeleting(false)} />}
       {mode && (
         <Dialog
           open
