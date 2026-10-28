@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn as clsx } from "@/components/ui/cn";
 import { Checkbox, Field, Input, Select } from "@/components/ui/form";
+import { SearchChecklist } from "@/components/ui/search-select";
 import { Dialog } from "@/components/ui/overlay";
 import type { LeadPage } from "@/domain/dto";
 import { EMPTY_FILTERS } from "@/domain/filters";
@@ -80,7 +81,9 @@ function Destination({ mode, setMode, to, setTo, count, allowSwap, swapWith, set
       {mode === "share" && (
         <fieldset className="space-y-1.5">
           <legend className="mb-1 text-sm font-medium">Agents (handed out in turn, oldest lead first)</legend>
-          {agents.map((a) => <Checkbox key={a.id} label={a.fullName} checked={to.includes(a.id)} onChange={(v) => setTo(v ? [...to, a.id] : to.filter((x) => x !== a.id))} />)}
+          <SearchChecklist label="Agents">
+            {agents.map((a) => <Checkbox key={a.id} label={a.fullName} checked={to.includes(a.id)} onChange={(v) => setTo(v ? [...to, a.id] : to.filter((x) => x !== a.id))} />)}
+          </SearchChecklist>
         </fieldset>
       )}
       {mode === "swap" && setSwapWith && (

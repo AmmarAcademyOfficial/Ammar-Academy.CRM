@@ -6,6 +6,7 @@ import { Pill, SupportStatusBadge } from "@/components/ui/badges";
 import { Button, IconButton } from "@/components/ui/button";
 import { cn as clsx } from "@/components/ui/cn";
 import { Checkbox, Field, Input, Select } from "@/components/ui/form";
+import { SearchChecklist } from "@/components/ui/search-select";
 import { Card, EmptyState, Name, PhoneText, SkeletonRows } from "@/components/ui/misc";
 import { Dialog } from "@/components/ui/overlay";
 import type { EnrollmentFilters, EnrollmentList, EnrollmentListRow, EnrollmentSortKey, EnrollmentStatus, PaymentState } from "@/domain/dto";
@@ -277,7 +278,8 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
   return (
     <fieldset className="space-y-1.5">
       <legend className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted">{title}</legend>
-      {children}
+      {/* More than 7 choices: a search box (ticked ones stay visible). */}
+      <SearchChecklist label={title}>{children}</SearchChecklist>
     </fieldset>
   );
 }
@@ -321,21 +323,19 @@ function FiltersDialog({ value, onApply, onClose }: { value: EnrollmentFilters; 
         </fieldset>
         <Group title="Program">{ref.programs.map((p) => <Checkbox key={p.id} label={p.name} checked={has("programIds", p.id)} onChange={() => toggle("programIds", p.id)} />)}</Group>
         <Group title="Course type">{ref.courseTypes.filter((t) => !t.archived).map((t) => <Checkbox key={t.id} label={t.name} checked={has("courseTypeIds", t.id)} onChange={() => toggle("courseTypeIds", t.id)} />)}</Group>
-        <Group title="Course"><div className="max-h-48 space-y-1.5 overflow-y-auto pr-1">{courses.map((c) => <Checkbox key={c.id} label={c.name} checked={has("courseIds", c.id)} onChange={() => toggle("courseIds", c.id)} />)}</div></Group>
+        <Group title="Course">{courses.map((c) => <Checkbox key={c.id} label={c.name} checked={has("courseIds", c.id)} onChange={() => toggle("courseIds", c.id)} />)}</Group>
         <Group title="Status">{(Object.keys(STATUS_LABEL) as EnrollmentStatus[]).map((s) => <Checkbox key={s} label={STATUS_LABEL[s]} checked={has("statuses", s)} onChange={() => toggle("statuses", s)} />)}</Group>
         <Group title="Payments">{(Object.keys(PAYMENT_LABEL) as PaymentState[]).map((s) => <Checkbox key={s} label={PAYMENT_LABEL[s]} checked={has("paymentStates", s)} onChange={() => toggle("paymentStates", s)} />)}</Group>
         <Group title="Sales agent (who made the sale)">
-          <div className="max-h-48 space-y-1.5 overflow-y-auto pr-1">
-            {sales.map((p) => <Checkbox key={p.id} label={p.fullName} checked={has("salesAgentIds", p.id)} onChange={() => toggle("salesAgentIds", p.id)} />)}
-            <Checkbox label="No sales agent" checked={has("salesAgentIds", "none")} onChange={() => toggle("salesAgentIds", "none")} />
-          </div>
+          {sales.map((p) => <Checkbox key={p.id} label={p.fullName} checked={has("salesAgentIds", p.id)} onChange={() => toggle("salesAgentIds", p.id)} />)}
+          <Checkbox label="No sales agent" checked={has("salesAgentIds", "none")} onChange={() => toggle("salesAgentIds", "none")} />
         </Group>
         <Group title="Support owner">
           {support.map((p) => <Checkbox key={p.id} label={p.fullName} checked={has("supportOwnerIds", p.id)} onChange={() => toggle("supportOwnerIds", p.id)} />)}
           <Checkbox label="No support owner (unclaimed)" checked={has("supportOwnerIds", "none")} onChange={() => toggle("supportOwnerIds", "none")} />
         </Group>
         {ref.teachers.length > 0 && (
-          <Group title="Teacher"><div className="max-h-48 space-y-1.5 overflow-y-auto pr-1">{ref.teachers.map((t) => <Checkbox key={t.id} label={t.fullName} checked={has("teacherIds", t.id)} onChange={() => toggle("teacherIds", t.id)} />)}</div></Group>
+          <Group title="Teacher">{ref.teachers.map((t) => <Checkbox key={t.id} label={t.fullName} checked={has("teacherIds", t.id)} onChange={() => toggle("teacherIds", t.id)} />)}</Group>
         )}
         <Group title="Currency">
           <Select aria-label="Currency" value={f.currency} onChange={(e) => setF({ ...f, currency: e.target.value })}>
