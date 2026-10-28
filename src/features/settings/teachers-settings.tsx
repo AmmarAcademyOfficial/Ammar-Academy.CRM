@@ -1,6 +1,6 @@
 "use client";
 
-import { Archive, ArchiveRestore, GraduationCap, Pencil, Plus, UserPlus, Users } from "lucide-react";
+import { Archive, ArchiveRestore, GraduationCap, Pencil, Plus, Trash2, UserPlus, Users } from "lucide-react";
 import { useState } from "react";
 import { Button, IconButton } from "@/components/ui/button";
 import { cn as clsx } from "@/components/ui/cn";
@@ -15,6 +15,7 @@ import { formatDay } from "@/features/leads/filters";
 import { useRunAction } from "@/lib/run-action";
 import { useApi, useWorkspace } from "@/lib/workspace";
 import { updateSettings } from "@/server/actions";
+import { DeleteDialog } from "@/features/deleted/delete-dialog";
 import { addTeacherRate, assignTeacher, endTeacherAssignment, saveTeacher, setTeacherRateAmount, setTeacherRateArchived } from "@/server/teacher-actions";
 import { NumberSetting } from "./settings-page";
 
@@ -33,6 +34,7 @@ export function TeachersSettings() {
   const [addingRate, setAddingRate] = useState<Teacher | null>(null);
   const [changing, setChanging] = useState<TeacherRate | null>(null);
   const [grouping, setGrouping] = useState<Teacher | null>(null);
+  const [deleting, setDeleting] = useState<{ kind: "teacher"; teacher: Teacher } | { kind: "rate"; rate: TeacherRate } | null>(null);
   const { data: assignments } = useApi<TeacherAssignment[]>("/api/teacher-assignments");
   const runAction = useRunAction();
 
@@ -80,6 +82,7 @@ export function TeachersSettings() {
                       {t.notes && <p className="mt-1 text-sm text-ink/80" dir="auto">{t.notes}</p>}
                     </div>
                     <IconButton label={`Edit ${t.fullName}`} icon={<Pencil size={14} />} onClick={() => setEditing(t)} />
+                    <IconButton label={`Delete ${t.fullName}`} icon={<Trash2 size={14} />} onClick={() => setDeleting({ kind: "teacher", teacher: t })} />
                   </div>
 
                   <div className="mt-3 rounded-lg border border-line">
@@ -105,6 +108,7 @@ export function TeachersSettings() {
                               {!r.archived && <Button size="sm" onClick={() => setChanging(r)}>Change amount</Button>}
                               <IconButton label={r.archived ? `Restore ${r.name}` : `Archive ${r.name}`} icon={r.archived ? <ArchiveRestore size={14} /> : <Archive size={14} />}
                                 onClick={() => runAction(setTeacherRateArchived(r.id, !r.archived), r.archived ? "Rate restored" : "Rate archived. Past hours keep it.", { reference: true })} />
+                              <IconButton label={`Delete ${r.name}`} icon={<Trash2 size={14} />} onClick={() => setDeleting({ kind: "rate", rate: r })} />
                             </li>
                           );
                         })}
@@ -145,6 +149,21 @@ export function TeachersSettings() {
       {addingRate && <RateDialog teacher={addingRate} onClose={() => setAddingRate(null)} />}
       {changing && <AmountDialog rate={changing} onClose={() => setChanging(null)} />}
       {grouping && <GroupDialog teacher={grouping} onClose={() => setGrouping(null)} />}
+      {deleting?.kind === "teacher" && (
+        <DeleteDialog kind="teacher" id={deleting.teacher.id} onClose={() => setDeleting(null)}
+          alternative={deleting.teacher.active ? {
+            label: "Set Not active instead",
+            run: async () => (await runAction(saveTeacher({ ...deleting.teacher, active: false }),
+              "Teacher set to Not active. Their history is kept.", { reference: true })).ok,
+          } : null} />
+      )}
+      {deleting?.kind === "rate" && (
+        <DeleteDialog kind="rate" id={deleting.rate.id} onClose={() => setDeleting(null)}
+          alternative={deleting.rate.archived ? null : {
+            label: "Archive instead",
+            run: async () => (await runAction(setTeacherRateArchived(deleting.rate.id, true), "Rate archived. Past hours keep it.", { reference: true })).ok,
+          }} />
+      )}
     </div>
   );
 }

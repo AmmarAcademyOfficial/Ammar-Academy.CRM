@@ -16,6 +16,8 @@ const KIND: Record<DeleteKind, { label: string; className: string }> = {
   enrollment: { label: "Enrollment", className: "bg-navy-50 text-navy-900" },
   lead: { label: "Lead", className: "bg-[#eeeff3] text-[#4b4e66]" },
   customer: { label: "Person", className: "bg-bad-bg text-bad" },
+  teacher: { label: "Teacher", className: "bg-ok-bg text-ok" },
+  rate: { label: "Rate", className: "bg-warn-bg text-warn" },
 };
 
 /** Settings → Deleted items (managers) and Accounting → Deleted items (the accountant's own payments). */
@@ -26,7 +28,7 @@ export function DeletedItemsView() {
   const { data, loading } = useApi<{ items: DeletedItem[] }>("/api/deleted-items");
   const restore = async (it: DeletedItem) => {
     setBusy(it.id);
-    const r = await runAction(restoreDeleted(it.id), null);
+    const r = await runAction(restoreDeleted(it.id), null, { reference: it.kind === "teacher" || it.kind === "rate" });
     setBusy(null);
     if (r.ok) {
       runAction(Promise.resolve({ ok: true as const, value: null }),
