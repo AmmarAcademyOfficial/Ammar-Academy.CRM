@@ -138,7 +138,7 @@ export function RefundDialog({ enrollmentId, courseName, currency, paid, agreed,
     if (r.ok) {
       const v = r.value;
       runAction(Promise.resolve({ ok: true as const, value: null }), v.withdrawn
-        ? `Refund recorded. The customer withdrew${v.sessionsRemoved ? `; ${v.sessionsRemoved} future session${v.sessionsRemoved === 1 ? "" : "s"} removed` : ""}${v.duesCancelled ? `; ${v.duesCancelled} planned payment${v.duesCancelled === 1 ? "" : "s"} cancelled` : ""}.`
+        ? `Refund recorded. The customer withdrew${v.sessionsRemoved ? `; ${v.sessionsRemoved} future session${v.sessionsRemoved === 1 ? "" : "s"} removed` : ""}${v.duesCancelled ? `; ${v.duesCancelled} planned payment${v.duesCancelled === 1 ? "" : "s"} cancelled` : ""}${v.paymentsRejected ? `; ${v.paymentsRejected} payment${v.paymentsRejected === 1 ? "" : "s"} waiting for review rejected` : ""}.`
         : v.flagged ? "Refund recorded. The customer is now below the handover rule and was flagged for review." : "Refund recorded. The agreed total was lowered by the refund.");
       onClose();
     }

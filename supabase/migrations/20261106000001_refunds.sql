@@ -88,9 +88,11 @@ declare
   v_course text;
   v_id uuid;
 begin
-  select * into e from public.enrollments where id = nullif(p ->> 'enrollment_id', '')::uuid for update;
+  select * into e from public.enrollments where id = nullif(p ->> 'enrollment_id', '')::uuid;
   if not found then raise exception using errcode = 'CRM04', message = 'Enrollment not found.'; end if;
+  -- The lead first, then the enrollment: the same order as recording a payment, so the two never deadlock.
   perform private.inquiry_for_money(e.inquiry_id, true);  -- the lead's agent, the customer's support owner, managers, the accountant
+  select * into e from public.enrollments where id = e.id for update;
   select name into v_course from public.courses where id = e.course_id;
   if e.withdrawn_at is not null then perform private.fail('This customer has already withdrawn from this course.'); end if;
   if exists (select 1 from public.refunds where enrollment_id = e.id and status = 'requested') then
@@ -140,6 +142,7 @@ declare
   v_id uuid;
   v_sessions int := 0;
   v_dues int := 0;
+  v_rejected int := 0;
   v_flagged boolean := false;
   v_what text;
 begin
@@ -204,12 +207,26 @@ begin
     get diagnostics v_dues = row_count;
     update public.teacher_assignments set ended_on = greatest(started_on, v_today)
      where enrollment_id = e.id and (ended_on is null or ended_on > v_today);
+    -- Payments still waiting for review will not be taken: they are rejected, and whoever entered them is told.
+    with rej as (
+      update public.payments set status = 'rejected', decided_by = me, decided_at = now(),
+             decision_reason = 'The customer withdrew from the course after a refund'
+       where enrollment_id = e.id and status = 'pending'
+      returning id, submitted_by, amount)
+    select count(*) into v_rejected from rej;
+    if v_rejected > 0 then
+      insert into public.notifications (user_id, text, inquiry_id)
+      select distinct x.submitted_by, format('Payment rejected: %s · %s (the customer withdrew after a refund)', v_name, v_course), e.inquiry_id
+        from public.payments x
+       where x.enrollment_id = e.id and x.status = 'rejected' and x.decided_at = now() and x.submitted_by <> me;
+    end if;
     if o.id is not null then
       update public.onboardings set status = 'withdrawn', flagged_reason = null, version = version + 1 where id = o.id;
     end if;
     v_what := 'Withdrew from the course'
       || case when v_sessions > 0 then format(', %s future session%s removed', v_sessions, case when v_sessions = 1 then '' else 's' end) else '' end
-      || case when v_dues > 0 then format(', %s planned payment%s cancelled', v_dues, case when v_dues = 1 then '' else 's' end) else '' end;
+      || case when v_dues > 0 then format(', %s planned payment%s cancelled', v_dues, case when v_dues = 1 then '' else 's' end) else '' end
+      || case when v_rejected > 0 then format(', %s payment%s waiting for review rejected', v_rejected, case when v_rejected = 1 then '' else 's' end) else '' end;
   else
     -- Keep studying: the agreed total drops by the refund (for example a late discount).
     update public.enrollments set agreed_total = agreed_total - v_amount, version = version + 1, updated_at = now() where id = e.id;
@@ -228,7 +245,7 @@ begin
                             case when v_outcome = 'withdraw' then ' · withdrew' else '' end), e.inquiry_id, 'refund_update'
     from unnest(array[o.support_owner_id, e.original_sales_owner_id, rq.requested_by]) u
    where u is not null and u <> me and exists (select 1 from public.profiles pr where pr.id = u and pr.active);
-  return jsonb_build_object('id', v_id, 'withdrawn', v_outcome = 'withdraw', 'sessionsRemoved', v_sessions, 'duesCancelled', v_dues, 'flagged', v_flagged);
+  return jsonb_build_object('id', v_id, 'withdrawn', v_outcome = 'withdraw', 'sessionsRemoved', v_sessions, 'duesCancelled', v_dues, 'paymentsRejected', v_rejected, 'flagged', v_flagged);
 end $$;
 
 -- A request that will not be paid. The person who asked is told why.
@@ -294,38 +311,6 @@ language sql stable security definer set search_path = '' as $$
   where e.id = p_enrollment
 $$;
 
-create or replace function private.dues_state(p_enrollment uuid default null, p_today date default (now() at time zone 'Africa/Cairo')::date)
-returns table (id uuid, enrollment_id uuid, inquiry_id uuid, due_on date, amount numeric, covered numeric, status text,
-               note text, currency text, due_soon_notified_at timestamptz, overdue_notified_at timestamptz)
-language sql stable security definer set search_path = '' as $$
-  with d as (
-    select pd.*, e.inquiry_id, e.currency, e.agreed_total,
-           sum(pd.amount) over (partition by pd.enrollment_id order by pd.due_on, pd.created_at, pd.id) as cum_to,
-           min(pd.created_at) over (partition by pd.enrollment_id) as plan_start
-      from public.payment_dues pd join public.enrollments e on e.id = pd.enrollment_id
-     where p_enrollment is null or pd.enrollment_id = p_enrollment
-  ), pools as (
-    select x.enrollment_id,
-           coalesce(sum(p.amount) filter (where p.status = 'confirmed' and p.submitted_at >= x.plan_start), 0) - private.refunded(x.enrollment_id) as pool,
-           coalesce(sum(p.amount) filter (where p.status = 'confirmed'), 0) - private.refunded(x.enrollment_id) as paid_all
-      from (select distinct d.enrollment_id, d.plan_start from d) x
-      left join public.payments p on p.enrollment_id = x.enrollment_id
-     group by x.enrollment_id
-  ), c as (
-    select d.*, case when pl.paid_all >= d.agreed_total - 0.005 then d.amount
-                     else greatest(0, least(d.amount, pl.pool - (d.cum_to - d.amount))) end as covered
-      from d join pools pl on pl.enrollment_id = d.enrollment_id
-  )
-  select c.id, c.enrollment_id, c.inquiry_id, c.due_on, c.amount, c.covered,
-         case when c.covered >= c.amount - 0.005 then 'paid'
-              when c.due_on < p_today then 'overdue'
-              when c.due_on = p_today then 'due_today'
-              when c.covered > 0 then 'partly_paid'
-              else 'upcoming' end,
-         c.note, c.currency, c.due_soon_notified_at, c.overdue_notified_at
-    from c
-$$;
-
 create or replace function private.record_payment(p jsonb, p_split uuid)
 returns uuid language plpgsql security definer set search_path = '' as $$
 declare
@@ -348,10 +333,10 @@ begin
   select * into e from public.enrollments where id = nullif(p ->> 'enrollment_id', '')::uuid;
   if not found then raise exception using errcode = 'CRM04', message = 'Enrollment not found.'; end if;
   q := private.inquiry_for_money(e.inquiry_id, true);
-  if e.withdrawn_at is not null then
+  perform 1 from public.enrollments where id = e.id for update; -- one submission at a time per enrollment
+  if (select withdrawn_at from public.enrollments where id = e.id) is not null then
     perform private.fail('This customer withdrew from this course, so no more payments can be recorded for it.');
   end if;
-  perform 1 from public.enrollments where id = e.id for update; -- one submission at a time per enrollment
   select name into v_course from public.courses where id = e.course_id;
 
   begin
@@ -419,6 +404,128 @@ begin
       update public.onboardings set flagged_reason = null, version = version + 1 where enrollment_id = e.id and flagged_reason is not null;
     end if;
   end if;
+  return v_id;
+end $$;
+
+create or replace function public.decide_payment(p_payment uuid, p_decision text, p_reason text default null)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  x public.payments;
+  e public.enrollments;
+  t record;
+  v_onb uuid;
+  v_flag_cleared boolean := false;
+  v_flagged boolean := false;
+begin
+  perform private.require_role('manager', 'accountant');
+  select * into x from public.payments where id = p_payment for update;
+  if not found then raise exception using errcode = 'CRM04', message = 'Payment not found.'; end if;
+  if x.status <> 'pending' then perform private.fail('This payment was already ' || x.status::text || '.'); end if;
+  if p_decision not in ('confirmed', 'rejected') then perform private.fail('Choose confirm or reject.'); end if;
+  if p_decision = 'rejected' and coalesce(trim(p_reason), '') = '' then perform private.fail('Add a reason so the agent knows what to fix.'); end if;
+  select * into e from public.enrollments where id = x.enrollment_id for update;
+  if p_decision = 'confirmed' and e.withdrawn_at is not null then
+    perform private.fail('This customer withdrew from this course after a refund, so this payment cannot be confirmed. Reject it instead.');
+  end if;
+
+  update public.payments set status = p_decision::public.payment_status, decided_by = auth.uid(), decided_at = now(),
+    decision_reason = nullif(trim(p_reason), '')
+  where id = x.id;
+  perform private.log_activity(e.inquiry_id, 'payment_decision',
+    format('Payment %s: %s%s', p_decision, private.money(x.amount, e.currency), coalesce(' · ' || nullif(trim(p_reason), ''), '')),
+    jsonb_build_object('payment_id', x.id, 'decision', p_decision, 'enrollment_id', e.id));
+  perform private.notify(x.submitted_by,
+    format('Payment %s: %s · %s%s', p_decision, private.contact_name(e.inquiry_id), private.money(x.amount, e.currency), coalesce(' (' || nullif(trim(p_reason), '') || ')', '')),
+    e.inquiry_id);
+
+  if p_decision = 'confirmed' then
+    if private.handover_met(e.id) then
+      v_onb := private.hand_over(e.id);
+      update public.onboardings set flagged_reason = null where enrollment_id = e.id and flagged_reason is not null;
+      v_flag_cleared := found;
+    end if;
+  else
+    v_flagged := private.flag_if_below(e.id, format('A payment of %s was rejected (%s)', private.money(x.amount, e.currency), trim(p_reason)));
+  end if;
+  select * into t from private.enrollment_totals(e.id);
+  return jsonb_build_object('handed_over', v_onb is not null, 'flag_cleared', v_flag_cleared, 'flagged', v_flagged,
+                            'paid', t.paid, 'balance', greatest(t.agreed - t.paid, 0));
+end $$;
+
+create or replace function public.reverse_payment(p_payment uuid, p_reason text)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  x public.payments;
+  e public.enrollments;
+  t record;
+  v_flagged boolean;
+begin
+  perform private.require_role('manager', 'accountant');
+  if coalesce(trim(p_reason), '') = '' then perform private.fail('Add the reason for the reversal.'); end if;
+  select * into x from public.payments where id = p_payment for update;
+  if not found then raise exception using errcode = 'CRM04', message = 'Payment not found.'; end if;
+  if x.status <> 'confirmed' then perform private.fail('Only confirmed payments can be reversed.'); end if;
+  select * into e from public.enrollments where id = x.enrollment_id for update;
+  select * into t from private.enrollment_totals(e.id);
+  if t.paid - x.amount < -0.005 then
+    perform private.fail(format('Refunds of %s were recorded for this course, so reversing this payment would leave paid below zero.', private.money(private.refunded(e.id), e.currency)));
+  end if;
+  update public.payments set status = 'reversed', reversed_by = auth.uid(), reversed_at = now(), reversal_reason = trim(p_reason)
+  where id = x.id;
+  perform private.log_activity(e.inquiry_id, 'payment_decision',
+    format('Payment reversed: %s · %s', private.money(x.amount, e.currency), trim(p_reason)),
+    jsonb_build_object('payment_id', x.id, 'decision', 'reversed', 'enrollment_id', e.id));
+  perform private.audit(format('Reversed payment %s (%s)', private.money(x.amount, e.currency), trim(p_reason)), private.contact_name(e.inquiry_id));
+  perform private.notify(x.submitted_by, format('Payment reversed: %s · %s', private.contact_name(e.inquiry_id), private.money(x.amount, e.currency)), e.inquiry_id);
+  v_flagged := private.flag_if_below(e.id, format('A confirmed payment of %s was reversed (%s)', private.money(x.amount, e.currency), trim(p_reason)));
+  select * into t from private.enrollment_totals(e.id);
+  return jsonb_build_object('flagged', v_flagged, 'paid', t.paid, 'balance', greatest(t.agreed - t.paid, 0));
+end $$;
+
+create or replace function public.save_payment_due(p jsonb)
+returns uuid language plpgsql security definer set search_path = '' as $$
+declare
+  e public.enrollments;
+  v_id uuid := nullif(p ->> 'id', '')::uuid;
+  v_due date := nullif(p ->> 'due_on', '')::date;
+  v_amount numeric := nullif(p ->> 'amount', '')::numeric;
+  v_today date := (now() at time zone 'Africa/Cairo')::date;
+  t record;
+  v_open numeric;
+begin
+  perform private.require_role('manager', 'support');
+  if v_id is not null then
+    select en.* into e from public.payment_dues d join public.enrollments en on en.id = d.enrollment_id where d.id = v_id;
+  else
+    select * into e from public.enrollments where id = (p ->> 'enrollment_id')::uuid;
+  end if;
+  if not found then raise exception using errcode = 'CRM04', message = 'Payment plan not found.'; end if;
+  perform private.inquiry_for_payment(e.inquiry_id);
+  perform 1 from public.enrollments where id = e.id for update;
+  if (select withdrawn_at from public.enrollments where id = e.id) is not null then
+    perform private.fail('This customer withdrew from this course, so it has no payment plan.');
+  end if;
+  if v_due is null then perform private.fail('Enter the due date.'); end if;
+  if v_due < v_today - 60 or v_due > v_today + 730 then perform private.fail('The due date must be within 60 days ago and 2 years ahead.'); end if;
+  if v_amount is null or v_amount <= 0 then perform private.fail('Enter the amount due.'); end if;
+
+  if v_id is null then
+    insert into public.payment_dues (enrollment_id, due_on, amount, note, created_by)
+    values (e.id, v_due, v_amount, nullif(trim(p ->> 'note'), ''), auth.uid()) returning id into v_id;
+  else
+    update public.payment_dues set due_on = v_due, amount = v_amount, note = nullif(trim(p ->> 'note'), ''), updated_at = now() where id = v_id;
+  end if;
+
+  -- The unpaid part of the plan cannot be more than the balance left.
+  select * into t from private.enrollment_totals(e.id);
+  select coalesce(sum(s.amount - s.covered), 0) into v_open from private.dues_state(e.id) s where s.status <> 'paid';
+  if v_open > t.agreed - t.paid + 0.005 then
+    perform private.fail(format('The planned payments add up to more than the balance left (%s).', private.money(greatest(t.agreed - t.paid, 0), e.currency)));
+  end if;
+
+  perform private.log_activity(e.inquiry_id, 'payment_plan',
+    format('Payment plan: %s due %s', private.money(v_amount, e.currency), to_char(v_due, 'FMDD Mon YYYY')),
+    jsonb_build_object('due_id', v_id, 'due_on', v_due, 'amount', v_amount));
   return v_id;
 end $$;
 
@@ -985,6 +1092,10 @@ begin
   if v ->> 'closedMonth' is not null then
     perform private.fail(format('This has sessions in a closed salary month (%s), so it cannot be deleted. A manager can reopen the month in Accounting → Teachers, then delete it.',
       v ->> 'closedMonth'));
+  end if;
+  if v_kind = 'payment' and (select status from public.payments where id = v_id) = 'confirmed'
+     and (select paid from private.enrollment_totals((v ->> 'enrollmentId')::uuid)) - (select amount from public.payments where id = v_id) < -0.005 then
+    perform private.fail('Refunds were recorded for this course, so deleting this payment would leave paid below zero.');
   end if;
   if (v ->> 'needsTyped')::boolean and coalesce(p ->> 'confirm', '') <> 'DELETE' then
     perform private.fail('This includes confirmed money. Type DELETE to confirm.');

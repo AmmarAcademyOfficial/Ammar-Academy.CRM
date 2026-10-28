@@ -26,7 +26,8 @@ const HANDOVER_TEXT = {
   needs_full_payment: "Not handed over yet: handover waits for full payment.",
 } as const;
 
-const left = (b: EnrollmentBundle) => Math.max(b.totals.agreed - b.totals.paid - b.totals.pending, 0);
+// A withdrawn course takes no more payments (plan 3).
+const left = (b: EnrollmentBundle) => (b.enrollment.withdrawnAt ? 0 : Math.max(b.totals.agreed - b.totals.paid - b.totals.pending, 0));
 
 /** Totals per currency across a customer's enrollments (currencies are never added together). */
 function perCurrency(courses: EnrollmentBundle[]) {

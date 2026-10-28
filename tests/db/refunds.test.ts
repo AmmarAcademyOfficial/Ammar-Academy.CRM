@@ -155,6 +155,53 @@ describe("recording a refund", () => {
   });
 });
 
+describe("review fixes: what a refund must not break", () => {
+  it("Withdraw rejects payments still waiting for review, and a withdrawn course cannot have one confirmed", async () => {
+    const c = await customer();
+    const pending = await pay(agent, c.enrollment, 1000);
+    const r = await record(manager, { enrollment_id: c.enrollment, amount: 3000, reason: "withdrew", outcome: "withdraw" });
+    expect(r).toMatchObject({ withdrawn: true, paymentsRejected: 1 });
+    expect((await admin<{ status: string }>("select status::text from public.payments where id = $1", [pending]))[0].status).toBe("rejected");
+    expect((await notes(agent, "Payment rejected: %withdrew after a refund)")).length).toBe(1);
+    // Even a payment that slipped in stays unconfirmable.
+    await admin("update public.payments set status = 'pending', decided_by = null, decided_at = null where id = $1", [pending]);
+    await expectError(as(manager, (q) => q("select public.decide_payment($1, 'confirmed')", [pending])), "CRM01", "cannot be confirmed");
+    await expectError(as(support, (q) => q("select public.save_payment_due($1)", [{ enrollment_id: c.enrollment, due_on: cairoDate(), amount: 100 }])), "CRM01", "no payment plan");
+  });
+
+  it("Keep studying leaves the payment plan right: paid planned payments stay paid", async () => {
+    const inquiry = (await createInquiry(agent, { program_id: prog })).inquiry_id;
+    const e = await enroll(agent, { inquiry_id: inquiry, course_id: course, agreed_total: 3000, price_note: "Test price" });
+    for (const d of [-40, -10, 20]) await admin(`insert into public.payment_dues (enrollment_id, due_on, amount, created_by) values ($1, current_date + ${d}, 1000, $2)`, [e, manager.id]);
+    await pay(manager, e, 1000, { kind: "deposit" });
+    await pay(manager, e, 1000);
+    await record(manager, { enrollment_id: e, amount: 500, reason: "goodwill", outcome: "keep" });
+    const dues = await admin<{ status: string }>("select status from private.dues_state($1) order by due_on", [e]);
+    expect(dues.map((d) => d.status)).toEqual(["paid", "paid", "upcoming"]);
+    expect(await totals(e)).toMatchObject({ agreed: "2500.00", paid: "1500.00" }); // 1,000 left = the open planned payment
+  });
+
+  it("Withdraw cancels only planned payments that were not paid", async () => {
+    const inquiry = (await createInquiry(agent, { program_id: prog })).inquiry_id;
+    const e = await enroll(agent, { inquiry_id: inquiry, course_id: course, agreed_total: 3000, price_note: "Test price" });
+    for (const d of [-40, -10, 20]) await admin(`insert into public.payment_dues (enrollment_id, due_on, amount, created_by) values ($1, current_date + ${d}, 1000, $2)`, [e, manager.id]);
+    await pay(manager, e, 1000, { kind: "deposit" });
+    await pay(manager, e, 1000);
+    const r = await record(manager, { enrollment_id: e, amount: 500, reason: "withdrew", outcome: "withdraw" });
+    expect(r.duesCancelled).toBe(1);
+    expect((await admin<{ n: number }>("select count(*)::int as n from public.payment_dues where enrollment_id = $1", [e]))[0].n).toBe(2);
+  });
+
+  it("a payment cannot be reversed or deleted if that would leave paid below zero after refunds", async () => {
+    const inquiry = (await createInquiry(agent, { program_id: prog })).inquiry_id;
+    const e = await enroll(agent, { inquiry_id: inquiry, course_id: course, agreed_total: 3000, price_note: "Test price" });
+    const p1 = await pay(manager, e, 1000, { kind: "deposit" });
+    await record(manager, { enrollment_id: e, amount: 1000, reason: "goodwill", outcome: "keep" });
+    await expectError(as(manager, (q) => q("select public.reverse_payment($1, 'Bounced')", [p1])), "CRM01", "below zero");
+    await expectError(one(manager, "select public.delete_record($1) as r", [{ kind: "payment", id: p1, reason: "x", confirm: "DELETE" }]), "CRM01", "below zero");
+  });
+});
+
 describe("refunds everywhere else", () => {
   it("Reports: confirmed money net of refunds, refunds and withdrawals on their own", async () => {
     const c = await customer();

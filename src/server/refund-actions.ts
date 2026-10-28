@@ -42,7 +42,7 @@ const recordSchema = z.object({
   outcome: z.enum(["withdraw", "keep"]),
 });
 
-export interface RecordedRefund { id: string; withdrawn: boolean; sessionsRemoved: number; duesCancelled: number; flagged: boolean }
+export interface RecordedRefund { id: string; withdrawn: boolean; sessionsRemoved: number; duesCancelled: number; paymentsRejected: number; flagged: boolean }
 
 export async function recordRefund(input: z.input<typeof recordSchema>): Promise<Result<RecordedRefund>> {
   return attempt(async () => {
