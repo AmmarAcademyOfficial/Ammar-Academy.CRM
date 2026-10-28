@@ -78,7 +78,8 @@ function AssignDialog({ detail, onClose }: { detail: LeadDetail; onClose: () => 
   const { ref, now } = useWorkspace();
   const runAction = useRunAction();
   const today = cairoParts(now).date;
-  const program = detail.row.inquiry.programId;
+  // The course's own program (a customer can have courses in several programs).
+  const program = ref.courses.find((c) => c.id === detail.enrollment?.courseId)?.programId ?? detail.row.inquiry.programId;
   const teachers = ref.teachers.filter((t) => t.active && ref.teacherRates.some((r) => r.teacherId === t.id && !r.archived));
   const forProgram = teachers.filter((t) => t.programIds.includes(program));
   const list = forProgram.length ? [...forProgram, ...teachers.filter((t) => !forProgram.includes(t))] : teachers;
