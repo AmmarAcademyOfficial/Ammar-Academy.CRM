@@ -12,8 +12,8 @@ export const enrollmentFiltersSchema = z.object({
   teacherIds: z.array(uuid).max(100).default([]),
   salesAgentIds: z.array(z.union([uuid, z.literal("none")])).max(100).default([]),
   supportOwnerIds: z.array(z.union([uuid, z.literal("none")])).max(100).default([]),
-  statuses: z.array(z.enum(["not_handed_over", "new_customer", "onboarding", "active", "flagged"])).default([]),
-  paymentStates: z.array(z.enum(["paid", "balance", "overdue", "pending", "none"])).default([]),
+  statuses: z.array(z.enum(["not_handed_over", "new_customer", "onboarding", "active", "flagged", "withdrawn"])).default([]),
+  paymentStates: z.array(z.enum(["paid", "balance", "overdue", "pending", "none", "refunded"])).default([]),
   currency: z.string().regex(/^([A-Z]{3})?$/).default(""),
   enrolledFrom: day, enrolledTo: day, startFrom: day, startTo: day,
 });
