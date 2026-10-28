@@ -15,7 +15,7 @@ const schema = z.object({
 /** Reports (managers only). Dates are Cairo calendar days, both inclusive. */
 export async function GET(req: NextRequest) {
   return apiRoute(async (staff) => {
-    if (staff.role !== "manager") forbidden("Only managers can see reports.");
+    if (staff.role !== "manager" && staff.role !== "accountant") forbidden("Only managers and the accountant can see reports.");
     const p = req.nextUrl.searchParams;
     const parsed = schema.safeParse({
       from: p.get("from"), to: p.get("to"),

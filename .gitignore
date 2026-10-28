@@ -49,3 +49,4 @@ next-env.d.ts
 
 # backups contain personal data: never commit them
 /backups/
+__pycache__/

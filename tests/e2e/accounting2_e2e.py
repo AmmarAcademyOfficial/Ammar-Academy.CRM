@@ -14,6 +14,7 @@ import subprocess
 import sys
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from playwright.sync_api import expect, sync_playwright
 import hydration  # noqa: F401  (waits for the page to be interactive after each load)
@@ -72,7 +73,7 @@ def academy_month(d: date):
     return date(start_y, start_m, 26), min(date(end_y, end_m, 25), d)
 
 
-today = (datetime.now(timezone.utc) + timedelta(hours=3)).date()
+today = datetime.now(ZoneInfo("Africa/Cairo")).date()
 a_from, a_to = academy_month(today)
 karim, hana = [sql("select id from public.profiles where full_name = $1", [n])[0]["id"] for n in ("Karim Fawzy", "Hana Farouk")]
 confirmed_sum = lambda extra="", params=None: float(sql(f"""
@@ -159,23 +160,20 @@ with sync_playwright() as p:
     actx = browser.new_context(viewport={"width": 1440, "height": 900})
     a = sign_in(actx, "Karim Fawzy", "/accounting")
     nav = [x.inner_text() for x in a.get_by_role("navigation", name="Main").first.get_by_role("link").all()]
-    check("The accountant's menu is Accounting only", nav == ["Accounting"], str(nav))
-    a.goto(f"{BASE}/leads")
-    a.wait_for_url("**/accounting")
-    check("Other pages send the accountant back to Accounting", True)
-    leads = a.request.get(f'{BASE}/api/leads?q={json.dumps({"filters": {}})}')
-    body = leads.json() if leads.ok else {}
-    check("The accountant gets no leads", leads.status in (400, 403) or body.get("total", 0) == 0, f"status {leads.status}")
+    check("The accountant's menu has Accounting first, then everything to read (Phase 1)",
+          nav == ["Accounting", "Leads", "Customers", "Sessions", "Payments", "Reports"], str(nav))
+    leads = a.request.get(f'{BASE}/api/leads?q={json.dumps({"filters": {}, "sort": {"key": "created", "dir": "desc"}, "page": 0, "pageSize": 25})}')
+    total_leads = sql("select count(*)::int as n from public.inquiries")[0]["n"]
+    check("The accountant reads every lead (Phase 1)", leads.ok and leads.json().get("total") == total_leads, f"status {leads.status}")
     expect(a.get_by_test_id("money-in")).to_have_text(egp(total))
     check("The accountant sees the same totals", True)
-    page_text = a.locator("main").inner_text()
-    check("No phone numbers on the accountant's screens", not re.search(r"\+20 ?\d", page_text))
 
-    # Bell: payment to review → Accounting payments.
+    # Bell: payment to review → the customer's record (Phase 1: the accountant opens customer records).
     a.get_by_role("button", name=re.compile("^Notifications")).click()
     a.get_by_role("button", name=re.compile("Payment to review: Hoda Salem")).first.click()
-    a.wait_for_url("**/accounting?tab=payments")
-    check("A payment-to-review notification takes the accountant to the payments", True)
+    expect(a.get_by_role("dialog", name="Customer details")).to_be_visible()
+    check("A payment-to-review notification opens the customer's record", True)
+    a.goto(f"{BASE}/accounting?tab=payments")
     a.reload()
     card = a.locator("article").filter(has_text="3,600 EGP").first
     receipt = card.get_by_role("link")

@@ -163,9 +163,9 @@ with sync_playwright() as p:
     d.locator("#receipt-file").set_input_files(str(receipt))
     expect(d.get_by_text("instapay-receipt.png")).to_be_visible()
     shot(s, "03-submit-payment")
-    d.get_by_role("button", name="Submit for confirmation").click()
-    expect(s.get_by_text("Payment submitted. A manager will confirm it.")).to_be_visible()
-    expect(panel.get_by_text("waiting for manager review (not counted yet)")).to_be_visible()
+    d.get_by_role("button", name="Record payment").click()
+    expect(s.get_by_text("Payment recorded. A manager or the accountant will confirm it.")).to_be_visible()
+    expect(panel.get_by_text("waiting for confirmation by a manager or the accountant")).to_be_visible()
     pay = sql("""select p.id, p.status, p.receipt_mime from public.payments p join public.enrollments e on e.id = p.enrollment_id
                  join public.inquiries i on i.id = e.inquiry_id join public.contacts c on c.id = i.contact_id where c.name = 'Nadine Wahba'""")[0]
     check("Payment saved as pending with a private receipt", pay["status"] == "pending" and pay["receipt_mime"] == "image/png")
@@ -180,7 +180,10 @@ with sync_playwright() as p:
     anon = browser.new_context().new_page()
     check("Signed-out visitors cannot open it", anon.request.get(f"{BASE}/api/receipts/{pay['id']}").status == 401)
 
-    # ── 5. Manager confirms → Enrolled and handed over ───────────────────
+    # ── 5. Handed over on recording (Phase 1); the manager confirms afterwards ──
+    st = sql("""select s.system_key, (select count(*)::int from public.onboardings o join public.enrollments e on e.id = o.enrollment_id where e.inquiry_id = i.id) as onb
+                from public.inquiries i join public.stages s on s.id = i.stage_id join public.contacts c on c.id = i.contact_id where c.name = 'Nadine Wahba'""")[0]
+    check("30% deposit recorded: stage Enrolled and handed over before confirmation", st["system_key"] == "enrolled" and st["onb"] == 1)
     m.goto(f"{BASE}/payments")
     card = m.locator("article").filter(has_text="2,400 EGP")
     expect(card).to_be_visible()
@@ -188,10 +191,11 @@ with sync_playwright() as p:
     r = m.request.get(f"{BASE}/api/receipts/{pay['id']}")
     check("The manager can open the receipt", r.status == 200)
     card.get_by_role("button", name="Confirm").click()
-    expect(m.get_by_text("Payment confirmed. The customer is Enrolled and handed over to support.")).to_be_visible()
-    st = sql("""select s.system_key, (select count(*)::int from public.onboardings o join public.enrollments e on e.id = o.enrollment_id where e.inquiry_id = i.id) as onb
-                from public.inquiries i join public.stages s on s.id = i.stage_id join public.contacts c on c.id = i.contact_id where c.name = 'Nadine Wahba'""")[0]
-    check("30% deposit confirmed: stage Enrolled, one onboarding record", st["system_key"] == "enrolled" and st["onb"] == 1)
+    expect(m.get_by_text("Payment confirmed", exact=True)).to_be_visible()
+    st = sql("""select (select count(*)::int from public.onboardings o join public.enrollments e on e.id = o.enrollment_id where e.inquiry_id = i.id) as onb,
+                       (select status::text from public.payments p join public.enrollments e on e.id = p.enrollment_id where e.inquiry_id = i.id limit 1) as pay
+                from public.inquiries i join public.contacts c on c.id = i.contact_id where c.name = 'Nadine Wahba'""")[0]
+    check("Confirming keeps the one onboarding record", st == {"onb": 1, "pay": "confirmed"}, json.dumps(st))
 
     # Reject Hoda's pending deposit with a reason.
     hoda_card = m.locator("article").filter(has_text="3,600 EGP")

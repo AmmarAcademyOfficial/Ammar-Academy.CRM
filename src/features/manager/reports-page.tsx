@@ -102,7 +102,7 @@ export function ReportsPage() {
             <Stat label="New inquiries" icon={<Inbox size={14} />} value={data.newInquiries} hint={`from ${data.distinctContacts} contacts`} />
             <Stat label="First contact (median)" icon={<Clock size={14} />} value={fmtMinutes(data.firstContact.medianWorkingMinutes)}
               hint={`working time · ${pct(data.firstContact.withinTarget, data.firstContact.measured)} within ${data.firstContactTargetMinutes} min`} />
-            <Stat label="Enrollments" icon={<GraduationCap size={14} />} value={data.enrollments} hint="handed over to support" tone={data.enrollments ? "ok" : undefined} />
+            <Stat label="Enrollments" icon={<GraduationCap size={14} />} value={data.enrollments} hint={data.additionalEnrollments ? `handed over to support · ${data.additionalEnrollments} additional (existing customers)` : "handed over to support"} tone={data.enrollments ? "ok" : undefined} />
             <Stat label="Confirmed payments" icon={<Wallet size={14} />} value={<span className="text-xl">{money(data.confirmed)}</span>} hint={`${data.confirmed.reduce((t, c) => t + c.count, 0)} payments`} />
             <Stat label="Lost" icon={<UserX size={14} />} value={data.lostTotal} hint="closed as Lost in range" />
           </div>

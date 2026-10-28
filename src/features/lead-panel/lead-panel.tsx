@@ -80,6 +80,8 @@ function LeadPanel({ inquiryId, onClose, onDirtyChange }: { inquiryId: ID; onClo
   const [detailsDirty, setDetailsDirty] = useState(false);
   const [menu, setMenu] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Phase 1: which course the Support tab shows when the customer has several handed-over enrollments.
+  const [courseSel, setCourseSel] = useState<string | null>(null);
   const noteRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => onDirtyChange(note.trim().length > 0 || detailsDirty), [note, detailsDirty, onDirtyChange]);
@@ -90,7 +92,7 @@ function LeadPanel({ inquiryId, onClose, onDirtyChange }: { inquiryId: ID; onClo
     if (!data || markedRef.current) return;
     const q = data.row.inquiry;
     const salesOwnerFirstOpen = me.role === "sales" && q.salesOwnerId === me.id && !q.ownerOpenedAt;
-    const supportOwnerFirstOpen = me.role === "support" && data.onboarding?.supportOwnerId === me.id && !data.onboarding.supportOpenedAt;
+    const supportOwnerFirstOpen = me.role === "support" && data.courses.some((b) => b.onboarding?.supportOwnerId === me.id && !b.onboarding.supportOpenedAt);
     if (!salesOwnerFirstOpen && !supportOwnerFirstOpen) return;
     markedRef.current = true;
     void runAction(salesOwnerFirstOpen ? markLeadOpened(q.id) : markCustomerOpened(q.id), null, { quiet: true });
@@ -119,8 +121,16 @@ function LeadPanel({ inquiryId, onClose, onDirtyChange }: { inquiryId: ID; onClo
 
   const q = row.inquiry;
   const ownsSales = me.role === "manager" || (me.role === "sales" && q.salesOwnerId === me.id);
-  const ob = data.onboarding;
-  const supportOwner = me.role === "support" && ob?.supportOwnerId === me.id;
+  // Phase 1: each enrollment has its own handover; support owns the customer when they own any of them.
+  const handed = data.courses.filter((b) => b.onboarding);
+  const selected = handed.find((b) => b.enrollment.id === courseSel)
+    ?? handed.find((b) => b.onboarding?.supportOwnerId === me.id) ?? handed[0];
+  const ob = selected?.onboarding;
+  const supportOwner = me.role === "support" && handed.some((b) => b.onboarding?.supportOwnerId === me.id);
+  const supportView: LeadDetail = selected
+    ? { ...data, enrollment: selected.enrollment, payments: selected.payments, totals: selected.totals, dues: selected.dues, teachers: selected.teachers,
+        sessions: selected.sessions, onboarding: selected.onboarding, supportFollowUps: selected.supportFollowUps }
+    : data;
   const canNote = ownsSales || supportOwner;
   const tabs: Tab[] = ob ? ["activity", "details", "payments", "support"] : ["activity", "details", "payments"];
   const shown: Tab = tabs.includes(tab) ? tab : "activity";
@@ -324,8 +334,24 @@ function LeadPanel({ inquiryId, onClose, onDirtyChange }: { inquiryId: ID; onClo
           </div>
         )}
         {shown === "details" && <DetailsTab row={row} values={data.fieldValues} onDirtyChange={setDetailsDirty} onReload={reload} />}
-        {shown === "payments" && <PaymentsTab detail={data} row={row} canWork={ownsSales} canPay={ownsSales || supportOwner} canPlan={me.role === "manager" || supportOwner} />}
-        {shown === "support" && ob && <SupportTab detail={data} />}
+        {shown === "payments" && (
+          <PaymentsTab detail={data} row={row} canWork={ownsSales} canAdd={ownsSales || supportOwner}
+            canPay={ownsSales || supportOwner || me.role === "accountant"} canPlan={me.role === "manager" || supportOwner} />
+        )}
+        {shown === "support" && ob && (
+          <>
+            {handed.length > 1 && (
+              <Field label="Course" className="mb-4">
+                {(p) => (
+                  <Select value={selected?.enrollment.id} onChange={(e) => setCourseSel(e.target.value)} {...p}>
+                    {handed.map((b) => <option key={b.enrollment.id} value={b.enrollment.id}>{ref.courses.find((c) => c.id === b.enrollment.courseId)?.name ?? "Course"} · {profileName(ref, b.onboarding?.supportOwnerId ?? null)}</option>)}
+                  </Select>
+                )}
+              </Field>
+            )}
+            <SupportTab key={selected?.enrollment.id} detail={supportView} />
+          </>
+        )}
       </div>
 
       {modal === "followup" && <FollowUpDialog onClose={() => setModal(null)} inquiryId={q.id} />}

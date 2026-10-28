@@ -51,7 +51,7 @@ const schema = z.object({
   teacher: z.object({ teacherId: uuid, rateId: uuid, subject: z.string().trim().max(60).optional() }).optional(),
 });
 
-export async function addExistingCustomer(input: z.input<typeof schema>): Promise<Result<{ inquiryId: string; pending: number }>> {
+export async function addExistingCustomer(input: z.input<typeof schema>): Promise<Result<{ inquiryId: string; pending: number; additional: boolean }>> {
   return attempt(async () => {
     const parsed = schema.safeParse(input);
     if (!parsed.success) throw new ValidationError(parsed.error.issues[0].message, parsed.error.issues.map((i) => i.message));
@@ -63,7 +63,7 @@ export async function addExistingCustomer(input: z.input<typeof schema>): Promis
       return { amount: p.amount, paid_on: p.paidOn, method: p.method, kind: p.kind, reference: p.reference || null, receipt };
     });
     const phone = v.phone ? normalizePhone(v.phone) : "";
-    const [{ r }] = await asUser(staff.id, (tx) => tx<{ r: { inquiry_id: string; pending: number } }[]>`select public.add_existing_customer(${tx.json({
+    const [{ r }] = await asUser(staff.id, (tx) => tx<{ r: { inquiry_id: string; pending: number; additional?: boolean } }[]>`select public.add_existing_customer(${tx.json({
       contact_id: v.contactId ?? null, name: v.name ?? null, phone: v.phone ?? null, phone_normalized: phone || null, contact_type: v.contactType ?? null,
       student_name: v.studentName || null, program_id: v.programId, course_id: v.courseId, agreed_total: v.agreedTotal, price_note: v.priceNote || null,
       enrolled_on: v.enrolledOn, sales_agent_id: v.salesAgentId ?? null, support_owner_id: v.supportOwnerId ?? null, status: v.status,
@@ -71,6 +71,6 @@ export async function addExistingCustomer(input: z.input<typeof schema>): Promis
       dues: v.dues.map((d) => ({ due_on: d.dueOn, amount: d.amount })),
       teacher: v.teacher ? { teacher_id: v.teacher.teacherId, rate_id: v.teacher.rateId, subject: v.teacher.subject || null } : null,
     })}) as r`);
-    return { inquiryId: r.inquiry_id, pending: Number(r.pending) };
+    return { inquiryId: r.inquiry_id, pending: Number(r.pending), additional: Boolean(r.additional) };
   });
 }

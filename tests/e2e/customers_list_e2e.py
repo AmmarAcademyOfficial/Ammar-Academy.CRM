@@ -129,8 +129,8 @@ with sync_playwright() as p:
     a.goto(f"{BASE}/accounting?tab=customers")
     arows = a.get_by_role("table", name="Customers").locator("tbody tr")
     expect(arows).to_have_count(min(ALL, 50))
-    phones = a.get_by_role("table", name="Customers").locator("text=/\\+20/").count()
-    check("Accounting → Customers is the same list, without phone numbers", phones == 0)
+    phones = a.get_by_role("table", name="Customers").locator("text=/\\+(20|971)/").count()
+    check("Accounting → Customers is the same list, with phone numbers (Phase 1)", phones == min(ALL, 50), str(phones))
     with a.expect_download() as dl:
         a.get_by_role("button", name="Download Excel").click()
     xlsx = Path(tempfile.mkdtemp()) / dl.value.suggested_filename  # openpyxl needs the .xlsx name
@@ -140,8 +140,8 @@ with sync_playwright() as p:
     headers = [c.value for c in ws[1]]
     values = [str(c.value) for row in ws.iter_rows() for c in row if c.value is not None]
     data_rows = [r for r in ws.iter_rows(min_row=2, values_only=True) if r[0] and not str(r[0]).startswith("Total ")]
-    check("The accountant downloads every matching customer as Excel, without phones",
-          len(data_rows) == ALL and "Phone" not in headers and not any("+20" in v for v in values), f"{len(data_rows)} rows")
+    check("The accountant downloads every matching customer as Excel, with phone numbers (Phase 1)",
+          len(data_rows) == ALL and "Phone" in headers, f"{len(data_rows)} rows")
 
     # ── 4. Sales cannot; phone layout ───────────────────────────────────────
     sctx = browser.new_context(viewport={"width": 1440, "height": 900})

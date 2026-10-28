@@ -52,15 +52,8 @@ export function WorkspaceProvider({ me, reference, serverNow, children }: { me: 
     [router],
   );
 
-  // Accountants have no customer panel (no access to leads or phone numbers): a notification about
-  // a customer takes them to the payments in Accounting instead.
-  const openInquiry = useCallback(
-    (id: ID | null) => {
-      if (me.role !== "accountant") setOpenInquiryId(id);
-      else if (id) router.push("/accounting?tab=payments");
-    },
-    [me.role, router],
-  );
+  // Everyone opens customer records (Phase 1: the accountant reads them, without changing them).
+  const openInquiry = useCallback((id: ID | null) => setOpenInquiryId(id), []);
 
   const value = useMemo<Workspace>(
     () => ({ me, ref: reference, now, openInquiryId, openInquiry, dataVersion, invalidate }),
@@ -108,12 +101,16 @@ export function useApi<T>(url: string | null, poll?: { everyMs?: number; whenHid
           router.replace("/login");
           return;
         }
-        const body = await r.json().catch(() => ({}));
-        if (!r.ok) setState((s) => ({ key, data: s.data, error: body.error ?? "Could not load data." }));
+        const body = await r.json().catch(() => undefined);
+        // A newer request replaced this one (for example after a save): its half-read reply is ignored.
+        if (ctrl.signal.aborted) return;
+        if (!r.ok) setState((s) => ({ key, data: s.data, error: body?.error ?? "Could not load data." }));
+        // An unreadable reply never replaces the data on screen with an empty answer.
+        else if (body === undefined) setState((s) => ({ key, data: s.data, error: "Could not load data. Retrying shortly." }));
         else setState({ key, data: body as T });
       })
       .catch((e) => {
-        if (e?.name !== "AbortError") setState((s) => ({ key, data: s.data, error: "You appear to be offline. Retrying shortly." }));
+        if (e?.name !== "AbortError" && !ctrl.signal.aborted) setState((s) => ({ key, data: s.data, error: "You appear to be offline. Retrying shortly." }));
       });
     return () => ctrl.abort();
   }, [url, key, router]);

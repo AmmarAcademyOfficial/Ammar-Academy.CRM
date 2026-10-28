@@ -17,6 +17,7 @@ import subprocess
 import sys
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from playwright.sync_api import expect, sync_playwright
 import hydration  # noqa: F401  (waits for the page to be interactive after each load)
@@ -72,7 +73,7 @@ def month_key(d: date, back: int):
 
 
 MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
-today = (datetime.now(timezone.utc) + timedelta(hours=3)).date()
+today = datetime.now(ZoneInfo("Africa/Cairo")).date()
 P = month_key(today, 3)
 P_LABEL = f"{MONTHS[int(P[5:]) - 1]} {P[:4]}"
 py, pm = int(P[:4]), int(P[5:])

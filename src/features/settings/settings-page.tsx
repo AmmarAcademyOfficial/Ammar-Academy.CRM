@@ -239,7 +239,7 @@ function InviteDialog({ onClose }: { onClose: () => void }) {
               <option value="sales">Sales Agent</option>
               <option value="support">Customer Support</option>
               <option value="manager">Manager</option>
-              <option value="accountant">Accountant (Accounting only, no phone numbers)</option>
+              <option value="accountant">Accountant (sees everything, records and reviews payments)</option>
             </Select>
           )}
         </Field>

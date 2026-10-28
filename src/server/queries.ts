@@ -1,6 +1,6 @@
 import "server-only";
 import type postgres from "postgres";
-import type { FollowUpItem, LeadDetail, LeadPage, LeadQuery, LeadRowDTO, MyWork, NotificationList, Overview, Reference, WorkBucket } from "@/domain/dto";
+import type { EnrollmentBundle, FollowUpItem, LeadDetail, LeadPage, LeadQuery, LeadRowDTO, MyWork, NotificationList, Overview, Reference, WorkBucket } from "@/domain/dto";
 import { latinDigits, normalizePhone } from "@/domain/rules";
 import type { Activity, FieldValue, FollowUp, LeadFilters, Role, SavedView } from "@/domain/types";
 import type { Staff } from "./auth";
@@ -211,7 +211,7 @@ export async function getLeadDetail(staff: Staff, id: string): Promise<LeadDetai
       tx<Row[]>`select r.* from public.note_revisions r join public.activities a on a.id = r.activity_id where a.inquiry_id = ${id} order by r.edited_at`,
       tx<Row[]>`select * from public.follow_ups where inquiry_id = ${id} order by status = 'open' desc, due_at`,
       tx<Row[]>`select field_id, value from public.field_values where inquiry_id = ${id}`,
-      tx<Row[]>`select * from public.enrollments where inquiry_id = ${id}`,
+      tx<Row[]>`select * from public.enrollments where inquiry_id = ${id} order by created_at, id`,
       tx<Row[]>`select * from public.earlier_inquiries(${id})`,
     ]);
     const activities: Activity[] = acts.map((a) => mapActivity(a, revs.filter((r) => r.activity_id === a.id)));
@@ -220,14 +220,15 @@ export async function getLeadDetail(staff: Staff, id: string): Promise<LeadDetai
     const row = mapLeadRow(rows[0]);
     row.inquiry.customFields = fieldValues;
     const detail: LeadDetail = {
-      row, activities, followUps: fus.map(mapFollowUp), fieldValues, payments: [], dues: [], teachers: [], sessions: [], supportFollowUps: [],
+      row, activities, followUps: fus.map(mapFollowUp), fieldValues, courses: [], payments: [], dues: [], teachers: [], sessions: [], supportFollowUps: [],
       earlier: earlier.map((e) => ({
         inquiryId: String(e.inquiry_id), programCode: String(e.program_code), createdAt: new Date(e.created_at as string).toISOString(),
         ownerName: e.owner_name ? String(e.owner_name) : null, stageLabel: String(e.stage_label), visible: Boolean(e.visible),
       })),
     };
-    if (enr[0]) {
-      const e = mapEnrollment(enr[0]);
+    // Every enrollment of this customer (Phase 1), oldest first; the single fields hold the first.
+    for (const er of enr) {
+      const e = mapEnrollment(er);
       const [pays, onb, dues, teach, sess] = await Promise.all([
         tx<Row[]>`select * from public.payments where enrollment_id = ${e.id} order by submitted_at desc`,
         tx<Row[]>`select * from public.onboardings where enrollment_id = ${e.id}`,
@@ -235,20 +236,27 @@ export async function getLeadDetail(staff: Staff, id: string): Promise<LeadDetai
         tx<Row[]>`select * from public.teacher_assignments where enrollment_id = ${e.id} order by ended_on nulls first, started_on desc`,
         tx<Row[]>`select s.*, a.subject from public.teacher_sessions s join public.teacher_assignments a on a.id = s.assignment_id where s.enrollment_id = ${e.id} order by s.starts_at`,
       ]);
-      detail.sessions = sess.map(mapSession);
-      detail.teachers = teach.map(mapTeacherAssignment);
-      detail.enrollment = e;
-      detail.payments = pays.map(mapPayment);
-      detail.dues = dues.map(mapPaymentDue);
-      detail.totals = totalsOf(e.agreedTotal, detail.payments);
+      const payments = pays.map(mapPayment);
+      const bundle: EnrollmentBundle = {
+        enrollment: e, payments, totals: totalsOf(e.agreedTotal, payments), dues: dues.map(mapPaymentDue),
+        teachers: teach.map(mapTeacherAssignment), sessions: sess.map(mapSession), supportFollowUps: [],
+      };
       if (onb[0]) {
         const [items, sfus] = await Promise.all([
           tx<Row[]>`select * from public.onboarding_items where onboarding_id = ${String(onb[0].id)} order by sort`,
           tx<Row[]>`select * from public.support_follow_ups where onboarding_id = ${String(onb[0].id)} order by status = 'open' desc, due_at`,
         ]);
-        detail.onboarding = mapOnboarding(onb[0], items);
-        detail.supportFollowUps = sfus.map(mapSupportFollowUp);
+        bundle.onboarding = mapOnboarding(onb[0], items);
+        bundle.supportFollowUps = sfus.map(mapSupportFollowUp);
       }
+      detail.courses.push(bundle);
+    }
+    const first = detail.courses[0];
+    if (first) {
+      Object.assign(detail, {
+        enrollment: first.enrollment, payments: first.payments, totals: first.totals, dues: first.dues, teachers: first.teachers,
+        sessions: first.sessions, onboarding: first.onboarding, supportFollowUps: first.supportFollowUps,
+      });
     }
     return detail;
   });

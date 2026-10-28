@@ -1,12 +1,12 @@
 /** Phase 5: report figures and working-hours time to first contact. */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { admin, as, closeDb, createInquiry, createUser, expectError, outcomeId, type TestUser } from "./helpers";
+import { admin, as, closeDb, createInquiry, createUser, expectError, outcomeId, type TestUser, cairoDate } from "./helpers";
 
 let manager: TestUser, agentA: TestUser, agentB: TestUser, support: TestUser, nightAgent: TestUser;
 let prog: string, groupType: string, privateType: string, groupCourse: string, privateCourse: string;
 const RECEIPT = { path: "receipts/11111111-2222-4333-8444-666666666666.pdf", name: "r.pdf", mime: "application/pdf", size: 900 };
 const cairo = (local: string) => `('${local}'::timestamp at time zone 'Africa/Cairo')`;
-const cairoToday = () => new Date(Date.now() + 3 * 3600_000).toISOString().slice(0, 10);
+const cairoToday = () => cairoDate();
 const shift = (u: TestUser, weekday: number, start: string, end: string) => {
   const m = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3));
   return admin("insert into public.shifts (user_id, weekday, start_minute, end_minute, program_ids) values ($1, $2, $3, $4, array[$5]::uuid[])", [u.id, weekday, m(start), m(end), prog]);
@@ -75,7 +75,8 @@ describe("report figures", () => {
     const b1 = await make(agentB, privateCourse);
     const b2 = await make(agentB, null);
     // First contact: a2 contacted 30 minutes after assignment (assignment moved back so the time is known).
-    await admin(`update public.inquiries set assigned_at = now() - interval '30 minutes' where id = $1`, [a2]);
+    // (Never before today's Cairo midnight, so the test works at any time of day.)
+    await admin(`update public.inquiries set assigned_at = greatest(now() - interval '30 minutes', date_trunc('day', now() at time zone 'Africa/Cairo') at time zone 'Africa/Cairo') where id = $1`, [a2]);
     await as(agentA, async (q) => q("select public.record_contact_attempt($1, $2)", [a2, await outcomeId("reached")]));
     await as(agentB, async (q) => q("select public.record_contact_attempt($1, $2)", [b1, await outcomeId("reached")]));
     await as(agentA, async (q) => q("select public.record_contact_attempt($1, $2)", [enrolledLead, await outcomeId("reached")]));

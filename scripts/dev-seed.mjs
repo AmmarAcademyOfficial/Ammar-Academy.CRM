@@ -177,14 +177,15 @@ export async function seedDev(admin) {
     writeFileSync(`${receiptsDir}/${id}.pdf`, pdf);
     return { path: `receipts/${id}.pdf`, name: "instapay-receipt.pdf", mime: "application/pdf", size: pdf.length };
   };
-  const today = new Date(Date.now() + 3 * 3600_000).toISOString().slice(0, 10);
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo" }).format(new Date()); // Cairo date
   const pay = async (user, enrollment, amount, method, reference, receipt = null) =>
     (await asUser(user, "select public.submit_payment($1) as id", [{ enrollment_id: enrollment, amount, paid_on: today, method, reference, receipt }]))[0].id;
   const decide = (payment, decision, reason = null) => asUser(manager, "select public.decide_payment($1, $2, $3)", [payment, decision, reason]);
 
   // Hoda Salem (Ali): enrolled in the December intensive, deposit submitted, waiting for a manager.
+  // 3,600 of 15,000 is below the 30% rule, so she stays with sales (Awaiting Payment) until more is paid.
   const hodaAli = await inquiryOf("Hoda Salem", "Ali");
-  const eHoda = await enroll(ids.nour, hodaAli, courses.satIntensive, 12000);
+  const eHoda = await enroll(ids.nour, hodaAli, courses.satIntensive, 15000, "Intensive plus the mock exam pack");
   await pay(ids.nour, eHoda, 3600, "instapay", "IPN-55501234", fakeReceipt());
   await asUser(ids.nour, "select public.set_inquiry_course($1, $2)", [await inquiryOf("Hoda Salem", "Salma"), courses.satFull]);
 
@@ -224,7 +225,17 @@ export async function seedDev(admin) {
   await asUser(manager, "select public.assign_teacher($1)", [{ teacher_id: tSami.id, rate_id: tSami.rates["SAT group"], course_id: courses.satFull, subject: "Math", started_on: "2026-10-01" }]);
   await asUser(manager, "select public.assign_teacher($1)", [{ teacher_id: tDina.id, rate_id: tDina.rates["IELTS private"], enrollment_id: eSara, started_on: "2026-10-15" }]);
   // Sessions: Sara's private lessons (two done, one not yet recorded, one tomorrow) and a group class today.
-  const at = (days, hour) => new Date(Date.parse(new Date(Date.now() + 3 * 3600_000).toISOString().slice(0, 10) + `T${String(hour).padStart(2, "0")}:00:00+03:00`) + days * 86_400_000).toISOString();
+  // A Cairo wall-clock time `days` from today, with the offset of that day (Egypt changes clocks).
+  const cairoOffset = (d) => {
+    const z = new Intl.DateTimeFormat("en-US", { timeZone: "Africa/Cairo", timeZoneName: "shortOffset" }).formatToParts(d).find((x) => x.type === "timeZoneName").value; // "GMT+3"
+    const [, sign, h, m] = z.match(/GMT([+-])(\d+)(?::(\d+))?/) ?? [, "+", "2", "0"];
+    return `${sign}${h.padStart(2, "0")}:${(m ?? "0").padStart(2, "0")}`;
+  };
+  const at = (days, hour) => {
+    const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo" }).format(new Date(Date.now() + days * 86_400_000));
+    const noon = new Date(`${day}T12:00:00Z`);
+    return new Date(`${day}T${String(hour).padStart(2, "0")}:00:00${cairoOffset(noon)}`).toISOString();
+  };
   const [{ id: aSara }] = await q("select id from public.teacher_assignments where enrollment_id = $1", [eSara]);
   const [{ id: aGroup }] = await q("select id from public.teacher_assignments where course_id = $1", [courses.satFull]);
   await asUser(manager, "select public.schedule_sessions($1)", [{ assignment_id: aSara, starts_at: at(-6, 17), planned_hours: 1.5, repeat_weeks: 0 }]);

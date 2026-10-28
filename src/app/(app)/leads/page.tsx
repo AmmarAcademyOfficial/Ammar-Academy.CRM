@@ -2,6 +2,6 @@ import { LeadsPage } from "@/features/leads/leads-page";
 import { pageFor } from "@/server/pages";
 
 export default async function Page() {
-  await pageFor("manager", "sales");
+  await pageFor("manager", "sales", "accountant");
   return <LeadsPage />;
 }

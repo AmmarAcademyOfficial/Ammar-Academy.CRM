@@ -137,13 +137,13 @@ with sync_playwright() as p:
     check("Payments have the planned columns", ph[:8] == ["Customer", "Phone", "Student", "Course", "Date paid", "Amount", "Currency", "Type"] and "Confirmed or rejected by" in ph, json.dumps(ph))
     check("The download is logged with the row count", last_audit()["target"].startswith(f"Enrollments · {ALL_ENROLLMENTS} rows"), last_audit()["target"])
 
-    # ── 3. Accountant: no phone numbers anywhere ────────────────────────────
+    # ── 3. Accountant: phone numbers too (Phase 1: the accountant sees everything) ──
     actx = browser.new_context(viewport={"width": 1440, "height": 900}, accept_downloads=True)
     a = sign_in(actx, "Karim Fawzy", "/accounting")
     a.goto(f"{BASE}/accounting?tab=customers")
     _, wb = download(a)
     text = " ".join(str(c.value) for sh in wb.worksheets for row in sh.iter_rows() for c in row if c.value is not None)
-    check("The accountant's file has no phone numbers", all("Phone" not in [c.value for c in sh[1]] for sh in wb.worksheets) and not re.search(r"\+\d{8,}", text))
+    check("The accountant's file has phone numbers (Phase 1)", "Phone" in [c.value for c in wb["Enrollments"][1]] and bool(re.search(r"\+\d{8,}", text)))
     check("The accountant's download is logged too", last_audit()["full_name"] == "Karim Fawzy")
 
     # ── 4. Support and sales cannot download ────────────────────────────────
@@ -160,8 +160,8 @@ with sync_playwright() as p:
     expect(s.get_by_role("button", name="Filters")).to_be_visible()
     lead_body = {"filters": {}, "sort": {"key": "created", "dir": "desc"}}
     check("Sales agents have no download button and the server refuses them", s.get_by_role("button", name="Download Excel").count() == 0
-          and s.request.post(f"{BASE}/api/leads/export", data=lead_body).status == 403
-          and a.request.post(f"{BASE}/api/leads/export", data=lead_body).status == 403)
+          and s.request.post(f"{BASE}/api/leads/export", data=lead_body).status == 403)
+    check("The accountant may download leads too (Phase 1)", a.request.post(f"{BASE}/api/leads/export", data=lead_body).status == 200)
 
     # ── 5. The download history in Settings → Audit ─────────────────────────
     m.goto(f"{BASE}/settings/audit")

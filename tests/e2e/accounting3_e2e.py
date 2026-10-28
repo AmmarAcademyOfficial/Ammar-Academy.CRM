@@ -13,6 +13,7 @@ import subprocess
 import sys
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from playwright.sync_api import expect, sync_playwright
 import hydration  # noqa: F401  (waits for the page to be interactive after each load)
@@ -57,7 +58,7 @@ def sign_in(ctx, name, path):
     return page
 
 
-today = (datetime.now(timezone.utc) + timedelta(hours=3)).date()
+today = datetime.now(ZoneInfo("Africa/Cairo")).date()
 next26 = (date(today.year + (today.month == 12 and today.day >= 26), (today.month % 12) + 1 if today.day >= 26 else today.month, 26))
 laila = sql("select id from public.profiles where full_name = 'Laila Ibrahim'")[0]["id"]
 jana = sql("""select i.id as inquiry, e.id as enrollment, o.id as onboarding from public.inquiries i join public.contacts c on c.id = i.contact_id

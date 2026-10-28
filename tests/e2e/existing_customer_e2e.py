@@ -11,6 +11,7 @@ import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from playwright.sync_api import expect, sync_playwright
 import hydration  # noqa: F401  (waits for the page to be interactive after each load)
@@ -55,7 +56,7 @@ def sign_in(ctx, name, path):
     return page
 
 
-today = (datetime.now(timezone.utc) + timedelta(hours=3)).date()
+today = datetime.now(ZoneInfo("Africa/Cairo")).date()
 past = (today - timedelta(days=40)).isoformat()
 paid_on = (today - timedelta(days=39)).isoformat()
 due_on = (today + timedelta(days=20)).isoformat()
@@ -138,10 +139,13 @@ with sync_playwright() as p:
     d.get_by_label("Payment 1 amount", exact=True).fill("1800")
     d.get_by_label("Payment 1 type", exact=True).select_option("full")
     d.get_by_role("button", name="Add customer").click()
-    expect(u.get_by_text("Customer added. The past payments are waiting for a manager or the accountant to confirm.")).to_be_visible()
-    rows = sql("""select count(*)::int as n, string_agg(p.status::text, ',') as pay from public.inquiries i join public.enrollments e on e.inquiry_id = i.id
-                  left join public.payments p on p.enrollment_id = e.id where i.contact_id = $1 and i.added_as_existing""", [sara["id"]])[0]
-    check("Support adds the enrollment to the existing person; their payment waits for review", rows == {"n": 1, "pay": "pending"}, json.dumps(rows))
+    expect(u.get_by_text("Course added to the customer's record. The past payments are waiting for a manager or the accountant to confirm.")).to_be_visible()
+    rows = sql("""select count(*)::int as n, string_agg(p.status::text, ',') as pay, count(distinct i.id)::int as records
+                    from public.inquiries i join public.enrollments e on e.inquiry_id = i.id
+                    left join public.payments p on p.enrollment_id = e.id where i.contact_id = $1 and e.added_as_existing""", [sara["id"]])[0]
+    leads = sql("select count(*)::int as n from public.inquiries where contact_id = $1", [sara["id"]])[0]["n"]
+    check("Support adds the course to the existing person's record (no second record); the payment waits for review",
+          rows == {"n": 1, "pay": "pending", "records": 1} and leads == 1, json.dumps([rows, leads]))
     shot(u, "02-support-added")
 
     # ── 3. Sales cannot; phone layout ───────────────────────────────────────

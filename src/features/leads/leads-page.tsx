@@ -46,6 +46,9 @@ export function LeadsPage() {
   const [picked, setPicked] = useState<Record<string, string | null>>({});
   const [pickingAll, setPickingAll] = useState(false);
   const canMove = me.role === "manager";
+  // Managers and the accountant see every lead; the accountant only reads (Phase 1).
+  const seesAll = me.role === "manager" || me.role === "accountant";
+  const canAdd = me.role !== "accountant";
   const [viewName, setViewName] = useState("");
 
   const search = useDebounced(filters.search, 300);
@@ -90,11 +93,11 @@ export function LeadsPage() {
   return (
     <div>
       <PageHeader
-        title={me.role === "manager" ? "All leads" : "My leads"}
-        subtitle={data ? `${total} ${hasFilters ? "matching " : ""}inquir${total === 1 ? "y" : "ies"}${me.role === "manager" ? "" : " assigned to you"}` : " "}
+        title={seesAll ? "All leads" : "My leads"}
+        subtitle={data ? `${total} ${hasFilters ? "matching " : ""}inquir${total === 1 ? "y" : "ies"}${seesAll ? "" : " assigned to you"}` : " "}
         actions={<>
           {canMove && <Button icon={<ArrowRightLeft size={16} />} onClick={() => setModal("move-agent")}>Move leads</Button>}
-          <Button variant="primary" icon={<Plus size={16} />} onClick={() => setModal("add")}>Add customer</Button>
+          {canAdd && <Button variant="primary" icon={<Plus size={16} />} onClick={() => setModal("add")}>Add customer</Button>}
         </>}
       />
 
@@ -148,7 +151,7 @@ export function LeadsPage() {
           </Button>
           <Button icon={<Columns3 size={16} />} onClick={() => setModal("columns")} className="hidden md:inline-flex">Columns</Button>
           <Button icon={<Save size={16} />} onClick={() => setModal("save")} disabled={!hasFilters}>Save view</Button>
-          {me.role === "manager" && <DownloadExcelButton url="/api/leads/export" body={{ filters: { ...filters, search }, sort }} disabled={!total} />}
+          {seesAll && <DownloadExcelButton url="/api/leads/export" body={{ filters: { ...filters, search }, sort }} disabled={!total} />}
         </div>
         {activeFilterCount(filters) > 0 && (
           <div className="border-b border-line px-3 py-2.5"><FilterChips value={filters} onChange={(f) => apply(f, null)} /></div>
@@ -176,7 +179,7 @@ export function LeadsPage() {
           <EmptyState
             icon={<Inbox size={22} />}
             title={hasFilters ? "No leads match these filters" : "No leads yet"}
-            action={hasFilters ? <Button onClick={() => apply(EMPTY_FILTERS)}>Clear Filters</Button> : <Button variant="primary" onClick={() => setModal("add")}>Add customer</Button>}
+            action={hasFilters ? <Button onClick={() => apply(EMPTY_FILTERS)}>Clear Filters</Button> : canAdd ? <Button variant="primary" onClick={() => setModal("add")}>Add customer</Button> : undefined}
           >
             {hasFilters ? "Try removing a filter or searching by part of the phone number." : me.role === "manager" ? "Add a customer, or connect Google Sheets in Settings." : "New inquiries appear here as soon as they are assigned to you."}
           </EmptyState>
@@ -260,7 +263,7 @@ export function LeadsPage() {
                       </span>
                       <span className={clsx("text-xs", t === "overdue" ? "font-medium text-bad" : "text-muted")}>
                         {f ? `${t === "overdue" ? "Overdue" : "Next"}: ${f.note} · ${formatCairo(f.dueAt)}` : r.stage.isClosed ? "Closed" : "No next action set"}
-                        {me.role === "manager" && ` · ${r.owner?.fullName ?? "Unassigned"}`}
+                        {seesAll && ` · ${r.owner?.fullName ?? "Unassigned"}`}
                       </span>
                     </button>
                   </li>

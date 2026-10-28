@@ -20,15 +20,19 @@ import { toCsv } from "@/lib/csv";
 import { profileName } from "@/lib/lead-row";
 import { useApi, useWorkspace } from "@/lib/workspace";
 import { TeachersView } from "./teachers-view";
+import { ReviewView } from "./review-view";
+import { AuditSettings } from "@/features/settings/audit-settings";
 import { EnrollmentsView } from "@/features/customers/enrollments-view";
 
-type Tab = "overview" | "payments" | "customers" | "agents" | "teachers";
+type Tab = "overview" | "review" | "payments" | "customers" | "agents" | "teachers" | "audit";
 const TABS: { id: Tab; label: string }[] = [
   { id: "overview", label: "Overview" },
+  { id: "review", label: "To review" },
   { id: "payments", label: "Payments" },
   { id: "customers", label: "Customers" },
   { id: "agents", label: "Sales agents" },
   { id: "teachers", label: "Teachers" },
+  { id: "audit", label: "Audit history" },
 ];
 
 interface Filters {
@@ -64,7 +68,7 @@ export function AccountingPage() {
   const [f, setF] = useState<Filters>(NO_FILTERS);
   const range = periodRange(period, today, custom);
   const valid = !!range.from && !!range.to && range.from <= range.to;
-  const teachersTab = tab === "teachers" || tab === "customers";  // these tabs bring their own filters
+  const teachersTab = tab === "teachers" || tab === "customers" || tab === "review" || tab === "audit";  // these tabs bring their own filters
   const { data, loading, error } = useApi<AccountingData>(valid && !teachersTab ? `/api/accounting?from=${range.from}&to=${range.to}` : null);
 
   const salesStaff = ref.profiles.filter((p) => p.role === "sales" || (p.role === "manager" && data?.customers.some((c) => c.salesAgentId === p.id)));
@@ -84,7 +88,7 @@ export function AccountingPage() {
 
   return (
     <div>
-      <PageHeader title="Accounting" subtitle={tab === "customers" ? "Every enrolled customer: agreed total, paid, balance and planned payments. Filters combine; currencies are never added together." : teachersTab ? "Teacher salaries per Academy month (26th to 25th), from the session hours support records. Currencies are never added together." : "Confirmed payments by the date the customer paid. Amounts in different currencies are never added together."} />
+      <PageHeader title="Accounting" subtitle={tab === "review" ? "What to check: new, additional and changed enrollments, and payments waiting for confirmation. Nothing waits for your review." : tab === "audit" ? "Every sensitive change and every download, who made it and when." : tab === "customers" ? "Every enrolled customer: agreed total, paid, balance and planned payments. Filters combine; currencies are never added together." : teachersTab ? "Teacher salaries per Academy month (26th to 25th), from the session hours support records. Currencies are never added together." : "Confirmed payments by the date the customer paid. Amounts in different currencies are never added together."} />
 
       {!teachersTab && <Card className="mb-4 p-3">
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 [&>*]:min-w-0">
@@ -143,6 +147,8 @@ export function AccountingPage() {
       </div>
 
       {tab === "teachers" && <TeachersView />}
+      {tab === "review" && <ReviewView />}
+      {tab === "audit" && <AuditSettings />}
       {tab === "customers" && <EnrollmentsView />}
       {!teachersTab && !valid && <Card className="p-4 text-sm text-bad">Choose a start date before the end date.</Card>}
       {!teachersTab && error && <Card className="p-4 text-sm text-bad">{error}</Card>}

@@ -5,14 +5,14 @@
  * Own program and people; synthetic data only.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { admin, as, closeDb, createInquiry, createUser, expectError, type TestUser } from "./helpers";
+import { admin, as, closeDb, createInquiry, createUser, expectError, type TestUser, cairoDate } from "./helpers";
 
 let manager: TestUser, accountant: TestUser, agent: TestUser, support: TestUser;
 let prog: string, course: string;
 const RECEIPT = { path: "receipts/11111111-2222-4333-8444-777777777777.jpg", name: "transfer.jpg", mime: "image/jpeg", size: 1234 };
 let refN = 0;
 const ref = () => `ACC-${Date.now()}-${++refN}`;
-const cairoToday = () => new Date(Date.now() + 3 * 3600_000).toISOString().slice(0, 10);
+const cairoToday = () => cairoDate();
 const plusDays = (d: string, n: number) => new Date(Date.parse(d + "T00:00:00Z") + n * 86_400_000).toISOString().slice(0, 10);
 
 async function sale(total = 10000) {
@@ -55,12 +55,14 @@ describe("accountant role", () => {
     await admin("update public.profiles set active = false where id = $1", [u.id]);
   });
 
-  it("has no row access to leads, contacts or payments", async () => {
+  it("reads every lead, contact, payment and the audit history, but cannot change a lead (Phase 1)", async () => {
     const s = await sale();
     await pay(s.enrollment, 1000);
-    for (const table of ["inquiries", "contacts", "enrollments", "payments", "activities", "onboardings", "payment_dues"]) {
-      expect(await as(accountant, (q) => q(`select 1 from public.${table} limit 1`)), table).toHaveLength(0);
+    for (const table of ["inquiries", "contacts", "enrollments", "payments", "activities", "onboardings", "audit_log"]) {
+      expect((await as(accountant, (q) => q(`select 1 from public.${table} limit 1`))).length, table).toBe(1);
     }
+    await expectError(as(accountant, (q) => q("select public.change_stage($1, 'lost', null, 'Test')", [s.inquiry])), "CRM03");
+    await expectError(as(accountant, (q) => q("update public.inquiries set student_name = 'X' where id = $1", [s.inquiry])), "42501");
   });
 
   it("is told about payments to review; confirms, rejects and reverses them", async () => {

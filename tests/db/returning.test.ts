@@ -4,7 +4,7 @@
  * Own programs and agents, so other test files never interfere. Synthetic data only.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { admin, as, closeDb, createUser, expectError, newPhone, type TestUser } from "./helpers";
+import { admin, as, cairoDate, closeDb, createUser, expectError, newPhone, type TestUser } from "./helpers";
 
 const MON_10 = "2026-01-12 10:00+02"; // Monday 10:00 Cairo
 
@@ -124,7 +124,7 @@ describe("returning customers go to their previous agent", () => {
     const prev = await agent("Leave Owner", 2031);
     await sells(prev, [progX]);
     const onShift = await agent("Covering Agent", 2032, [progX], true);
-    const day = new Date().toISOString().slice(0, 10);
+    const day = cairoDate(); // leave is a Cairo calendar day
     await as(manager, (q) => q("select public.save_time_off($1, $2, $2, 'Holiday')", [prev.id, day]));
     const c = await contact();
     await inquiry(c, progY, prev.id, "now() - interval '10 days'");

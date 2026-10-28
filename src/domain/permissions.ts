@@ -40,7 +40,7 @@ const MATRIX: Record<Role, Action[]> = {
   ],
   sales: ["inquiry.create", "payment.submit", "user.pause.self"],
   support: ["support.claim", "support.updateStatus"],
-  accountant: ["payment.decide"],
+  accountant: ["payment.decide", "payment.submit", "inquiry.viewAll", "reports.view"],
 };
 
 export function can(role: Role, action: Action, opts?: { agentsCanCreateTags?: boolean }): boolean {
@@ -59,7 +59,7 @@ export function canViewInquiry(
   inquiry: Inquiry,
   supportLinks: { onboardings: Onboarding[]; enrollments: Enrollment[] },
 ): boolean {
-  if (viewer.role === "manager") return true;
+  if (viewer.role === "manager" || viewer.role === "accountant") return true;
   if (viewer.role === "sales") return inquiry.salesOwnerId === viewer.id;
   // Support sees the sales history only for customers handed over to support.
   const enrollment = supportLinks.enrollments.find((e) => e.inquiryId === inquiry.id);
@@ -75,7 +75,8 @@ export function canWorkOnboarding(viewer: Viewer, ob: Onboarding): boolean {
 }
 
 export function canReadField(role: Role, f: FieldDefinition): boolean {
-  return f.visibleTo.includes(role);
+  // The accountant reads whatever managers read (Phase 1).
+  return f.visibleTo.includes(role) || (role === "accountant" && f.visibleTo.includes("manager"));
 }
 
 export function canEditField(role: Role, f: FieldDefinition): boolean {

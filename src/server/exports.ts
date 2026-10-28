@@ -209,13 +209,13 @@ type EnrollmentExport = EnrollmentList & { payments: ExportPayment[]; plan: Expo
 
 /**
  * The Enrollments list as an Excel file with three sheets (managers and accountants). The database
- * applies the role (no phone numbers for accountants) and records the download in the audit log.
+ * applies the role and records the download in the audit log.
  */
 export async function enrollmentsWorkbook(staff: Staff, q: EnrollmentExportQuery): Promise<{ file: Buffer; name: string; rows: number }> {
   return asUser(staff.id, async (tx) => {
     const label = await describeEnrollmentFilters(tx, q.filters);
     const [{ r }] = await tx<{ r: EnrollmentExport }[]>`select public.enrollments_list(${tx.json({ ...q, scope: "all", export: true, label })}) as r`;
-    const phones = staff.role !== "accountant";
+    const phones = true; // Phase 1: the accountant sees phone numbers too (the database decides what each role gets)
     const ph = <T,>(cols: T[]): T[] => (phones ? cols : []);
     const enrollments: Sheet = {
       name: "Enrollments",

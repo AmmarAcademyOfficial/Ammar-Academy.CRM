@@ -13,7 +13,7 @@ const schema = z.object({
 /** Audit history of sensitive changes (managers only, read-only). */
 export async function GET(req: NextRequest) {
   return apiRoute(async (staff) => {
-    if (staff.role !== "manager") forbidden("Only managers can see the audit history.");
+    if (staff.role !== "manager" && staff.role !== "accountant") forbidden("Only managers and the accountant can see the audit history.");
     const p = req.nextUrl.searchParams;
     return auditPage(staff, schema.parse({ q: p.get("q") ?? "", actor: p.get("actor") ?? "", page: p.get("page") ?? 0 }));
   });

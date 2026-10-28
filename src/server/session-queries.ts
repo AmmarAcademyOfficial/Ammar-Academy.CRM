@@ -3,6 +3,7 @@ import type { SessionAssignment, SessionsData } from "@/domain/dto";
 import type { Staff } from "./auth";
 import { asUser } from "./db";
 import { mapSession } from "./mappers";
+import { cairoParts } from "@/domain/rules";
 
 type Row = Record<string, unknown>;
 
@@ -12,8 +13,9 @@ type Row = Record<string, unknown>;
  */
 export async function sessionsData(staff: Staff, from: string, to: string): Promise<SessionsData> {
   return asUser(staff.id, async (tx) => {
-    const today = new Date(Date.now() + 3 * 3600_000).toISOString().slice(0, 10);
-    const back = new Date(Date.now() + 3 * 3600_000 - 60 * 86_400_000).toISOString().slice(0, 10);
+    // Cairo dates through the time-zone database (Egypt's summer time changes the offset).
+    const today = cairoParts(new Date()).date;
+    const back = cairoParts(new Date(Date.now() - 60 * 86_400_000)).date;
     const [rows, open, assignments] = await Promise.all([
       tx<Row[]>`select * from public.sessions_view(${from}::date, ${to}::date)`,
       tx<Row[]>`select * from public.sessions_view(${back}::date, ${today}::date) where status = 'scheduled' and starts_at < now()`,

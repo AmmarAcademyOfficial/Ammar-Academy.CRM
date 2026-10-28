@@ -13,6 +13,7 @@ import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from playwright.sync_api import expect, sync_playwright
 import hydration  # noqa: F401  (waits for the page to be interactive after each load)
@@ -57,7 +58,7 @@ def sign_in(ctx, name, path):
     return page
 
 
-cairo_now = datetime.now(timezone.utc) + timedelta(hours=3)
+cairo_now = datetime.now(ZoneInfo("Africa/Cairo"))
 sara = sql("""select e.id as enrollment, i.id as inquiry, a.id as assignment from public.enrollments e join public.inquiries i on i.id = e.inquiry_id
               join public.contacts c on c.id = i.contact_id join public.teacher_assignments a on a.enrollment_id = e.id where c.name = 'Sara Nasser'""")[0]
 sess = lambda: sql("select id, status, hours::float8 as hours, paid_hours::float8 as paid, student_hours::float8 as student, late_cancel from public.teacher_sessions where assignment_id = $1 order by starts_at", [sara["assignment"]])

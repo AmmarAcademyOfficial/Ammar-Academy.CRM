@@ -77,12 +77,11 @@ describe("Enrollments download", () => {
     expect((await audits())[0].target).toBe("Enrollments · 3 rows · payment: waiting for review");
   });
 
-  it("the accountant gets no phone numbers anywhere in the file", async () => {
+  it("the accountant's file has phone numbers too (Phase 1: the accountant sees everything)", async () => {
     const r = await exportAs(accountant);
     expect(r.rows.length).toBe(MANY);
-    expect(r.rows.every((x) => x.phone === null)).toBe(true);
-    expect(r.payments.every((x) => x.phone === null)).toBe(true);
-    expect(r.plan.every((x) => x.phone === null)).toBe(true);
+    expect(r.rows.every((x) => x.phone?.startsWith("+"))).toBe(true);
+    expect(r.payments.every((x) => x.phone?.startsWith("+"))).toBe(true);
     expect((await audits())[0].actor_id).toBe(accountant.id);
   });
 
@@ -116,8 +115,8 @@ describe("Leads download log", () => {
     expect(a.details).toMatchObject({ list: "leads", rows: 37, filters: { stageKeys: ["new"] } });
   });
 
-  it("only managers, and never more than 20,000 rows", async () => {
-    await expectError(log(accountant, 1), "CRM03");
+  it("only managers and the accountant, and never more than 20,000 rows", async () => {
+    await log(accountant, 1);
     await expectError(log(support, 1), "CRM03");
     await expectError(log(agent, 1), "CRM03");
     await expect(log(null, 1)).rejects.toThrow(/permission denied/);

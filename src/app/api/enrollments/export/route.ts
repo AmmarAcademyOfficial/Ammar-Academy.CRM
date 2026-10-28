@@ -4,7 +4,7 @@ import { forbidden } from "@/server/result";
 
 /**
  * Download the Enrollments list as Excel (Enrollments, Payments and Payment plan sheets): exactly what
- * the filters show, up to 20,000 rows. Managers and accountants (no phone numbers); logged.
+ * the filters show, up to 20,000 rows. Managers and the accountant; logged.
  */
 export async function POST(req: Request) {
   return exportRoute(async (staff) => {

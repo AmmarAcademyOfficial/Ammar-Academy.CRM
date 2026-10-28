@@ -1,13 +1,13 @@
 /** Phase 4: courses catalog, enrollments, payments, handover, reversal and support onboarding. */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { admin, as, closeDb, createInquiry, createUser, expectError, type TestUser } from "./helpers";
+import { admin, as, closeDb, createInquiry, createUser, expectError, type TestUser, cairoDate } from "./helpers";
 
 let manager: TestUser, agent: TestUser, otherAgent: TestUser, support1: TestUser, support2: TestUser;
 let prog: string, prog2: string, typeId: string, course: string, closedCourse: string, otherProgCourse: string;
 const RECEIPT = { path: "receipts/11111111-2222-4333-8444-555555555555.jpg", name: "transfer.jpg", mime: "image/jpeg", size: 1234 };
 let refN = 0;
 const ref = () => `REF-${Date.now()}-${++refN}`;
-const today = () => new Date(Date.now() + 3 * 3600_000).toISOString().slice(0, 10); // Cairo date (UTC+3 in October)
+const today = () => cairoDate();
 
 async function lead(user = agent, program = prog) {
   return (await createInquiry(user, { program_id: program })).inquiry_id;
@@ -76,6 +76,8 @@ describe("courses catalog", () => {
   });
 });
 
+const onboardingCount = async (e: string) => (await admin("select 1 from public.onboardings where enrollment_id = $1", [e])).length;
+
 describe("enrollments and payments", () => {
   it("a price different from the course price needs a reason", async () => {
     const i = await lead();
@@ -117,12 +119,13 @@ describe("enrollments and payments", () => {
     expect(await onboardingOf(e)).toBeUndefined();
   });
 
-  it("meeting the qualifying deposit hands over exactly once: Enrolled, checklist, support told", async () => {
+  it("recording the qualifying deposit hands over exactly once, without waiting for confirmation (Phase 1)", async () => {
     const i = await lead();
     const e = await enroll(i);
-    const p = await pay(e, 3000);
-    expect((await decide(p, "confirmed")).handed_over).toBe(true);
+    const p = await pay(e, 3000); // still waiting for review
+    expect((await admin<{ status: string }>("select status from public.payments where id = $1", [p]))[0].status).toBe("pending");
     expect(await stageOf(i)).toBe("enrolled");
+    expect((await decide(p, "confirmed")).handed_over).toBe(false); // already handed over
     const o = await onboardingOf(e);
     expect(o).toMatchObject({ status: "new_customer", support_owner_id: null });
     const items = await admin<{ label: string; due_at: Date }>("select label, due_at from public.onboarding_items where onboarding_id = $1 order by sort", [o.id]);
@@ -151,8 +154,10 @@ describe("enrollments and payments", () => {
     await admin("update public.app_settings set handover_trigger = 'full_payment'");
     try {
       const e = await enroll(await lead());
-      expect((await decide(await pay(e, 9000), "confirmed")).handed_over).toBe(false);
-      expect((await decide(await pay(e, 1000), "confirmed")).handed_over).toBe(true);
+      await pay(e, 9000);
+      expect(await onboardingCount(e)).toBe(0);
+      await pay(e, 1000); // the whole agreed total is now recorded
+      expect(await onboardingCount(e)).toBe(1);
     } finally {
       await admin("update public.app_settings set handover_trigger = 'qualifying_deposit'");
     }
@@ -163,8 +168,10 @@ describe("enrollments and payments", () => {
     const c3 = await as(manager, async (q) => (await q<{ id: string }>("select public.save_course($1) as id", [{ program_id: p3, course_type_id: typeId, name: "No Rule Course", price: 4000 }]))[0].id);
     const i = await lead(agent, p3);
     const e = await as(agent, async (q) => (await q<{ id: string }>("select public.save_enrollment($1) as id", [{ inquiry_id: i, course_id: c3, agreed_total: 4000 }]))[0].id);
-    expect((await decide(await pay(e, 3900), "confirmed")).handed_over).toBe(false);
-    expect((await decide(await pay(e, 100), "confirmed")).handed_over).toBe(true);
+    await pay(e, 3900);
+    expect(await onboardingCount(e)).toBe(0);
+    await pay(e, 100);
+    expect(await onboardingCount(e)).toBe(1);
   });
 
   it("after confirmed payments only a manager changes the agreed total, never below what is paid", async () => {

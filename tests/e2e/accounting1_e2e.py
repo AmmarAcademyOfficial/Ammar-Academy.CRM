@@ -15,6 +15,7 @@ import sys
 import zlib
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from playwright.sync_api import expect, sync_playwright
 import hydration  # noqa: F401  (waits for the page to be interactive after each load)
@@ -71,7 +72,7 @@ def uid(name):
     return sql("select id from public.profiles where full_name = $1", [name])[0]["id"]
 
 
-cairo_today = (datetime.now(timezone.utc) + timedelta(hours=3)).date()
+cairo_today = datetime.now(ZoneInfo("Africa/Cairo")).date()
 iso = lambda d: d.isoformat()
 laila, hana = uid("Laila Ibrahim"), uid("Hana Farouk")
 jana = sql("""select i.id as inquiry, e.id as enrollment, o.id as onboarding from public.inquiries i join public.contacts c on c.id = i.contact_id
@@ -122,8 +123,8 @@ with sync_playwright() as p:
     d.locator("#receipt-file").set_input_files(str(receipt))
     expect(d.get_by_text("accounting1-receipt.png")).to_be_visible()
     shot(u, "02-record-payment")
-    d.get_by_role("button", name="Submit for confirmation").click()
-    expect(u.get_by_text("Payment submitted. A manager will confirm it.")).to_be_visible()
+    d.get_by_role("button", name="Record payment").click()
+    expect(u.get_by_text("Payment recorded. A manager or the accountant will confirm it.")).to_be_visible()
     pay = sql("""select p.id, p.status, p.kind, p.submitted_by, p.receipt_mime from public.payments p where p.enrollment_id = $1 and p.reference = 'IPN-ACC1-4401'""", [jana["enrollment"]])[0]
     check("Support's payment is saved as a pending installment with the receipt",
           pay["status"] == "pending" and pay["kind"] == "installment" and pay["submitted_by"] == laila and pay["receipt_mime"] == "image/png")
